@@ -23,6 +23,13 @@ interface OfflineConversationsRepository {
     val roomListFlow: Flow<List<ConversationModel>>
 
     /**
+     * Network/HTTP failures from [getRooms]'s background sync (e.g. 401, 426, 503 with the
+     * maintenance-mode header). [roomListFlow] only observes the local database and never fails
+     * from a network error, so the UI needs this separate stream to react to them.
+     */
+    val getRoomsErrorFlow: Flow<Throwable>
+
+    /**
      * Stream of a single conversation, for use in each conversations settings.
      */
     @Deprecated("use observeConversation")
