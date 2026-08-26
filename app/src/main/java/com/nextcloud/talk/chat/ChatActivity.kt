@@ -195,6 +195,7 @@ import com.nextcloud.talk.utils.DateUtils
 import com.nextcloud.talk.utils.DisplayUtils
 import com.nextcloud.talk.utils.FileUtils
 import com.nextcloud.talk.utils.FileViewerUtils
+import com.nextcloud.talk.utils.HttpStatusInterceptor
 import com.nextcloud.talk.utils.Mimetype
 import com.nextcloud.talk.utils.NotificationUtils
 import com.nextcloud.talk.utils.ParticipantPermissions
@@ -288,6 +289,9 @@ class ChatActivity :
 
     @Inject
     lateinit var networkMonitor: NetworkMonitor
+
+    @Inject
+    lateinit var httpStatusInterceptor: HttpStatusInterceptor
 
     @Inject
     lateinit var chatViewModelFactory: ChatViewModel.ChatViewModelFactory
@@ -619,6 +623,11 @@ class ChatActivity :
             currentUserProvider.getCurrentUser()
                 .onSuccess { user ->
                     conversationUser = user
+                    user.id?.let { accountId ->
+                        chatViewModel.setMaintenanceMode(
+                            httpStatusInterceptor.currentStatus(accountId) == ServerStatus.MAINTENANCE_MODE
+                        )
+                    }
                     handleIntent(intent)
                     val urlForChatting = ApiUtils.getUrlForChat(chatApiVersion, conversationUser?.baseUrl, roomToken)
                     val credentials = ApiUtils.getCredentials(conversationUser!!.username, conversationUser!!.token)
