@@ -10,7 +10,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.displayCutoutPadding
@@ -34,7 +33,6 @@ import com.nextcloud.talk.application.NextcloudTalkApplication
 import com.nextcloud.talk.arbitrarystorage.ArbitraryStorageManager
 import com.nextcloud.talk.components.ColoredStatusBar
 import com.nextcloud.talk.components.StandardAppBar
-import com.nextcloud.talk.components.StatusBannerRow
 import com.nextcloud.talk.logger.LogsRepository
 import com.nextcloud.talk.users.UserManager
 import com.nextcloud.talk.utils.ClosedInterfaceImpl
@@ -79,7 +77,7 @@ class DiagnosisActivity : BaseActivity() {
         val useUnifiedPush = appPreferences.useUnifiedPush
         val useEmbeddedDistrib = UnifiedPushUtils.hasEmbeddedDistributor(context) && !useUnifiedPush
 
-        setContent {
+        setContentWithStatusBanner {
             val backgroundColor = colorResource(id = R.color.bg_default)
 
             val menuItems = listOf(
@@ -90,50 +88,46 @@ class DiagnosisActivity : BaseActivity() {
                 colorScheme = colorScheme
             ) {
                 val isOnline = networkMonitor.isOnline.collectAsState().value
-                val isMaintenanceMode = maintenanceModeFlow.collectAsState().value
                 ColoredStatusBar()
-                Column {
-                    StatusBannerRow(isOffline = !isOnline, isMaintenanceMode = isMaintenanceMode)
-                    Scaffold(
-                        modifier = Modifier
-                            .statusBarsPadding()
-                            .displayCutoutPadding(),
-                        topBar = {
-                            StandardAppBar(
-                                title = stringResource(R.string.nc_settings_diagnosis_title),
-                                menuItems
-                            )
-                        },
-                        content = { paddingValues ->
-                            val viewState = diagnosisViewModel.notificationViewState.collectAsState().value
+                Scaffold(
+                    modifier = Modifier
+                        .statusBarsPadding()
+                        .displayCutoutPadding(),
+                    topBar = {
+                        StandardAppBar(
+                            title = stringResource(R.string.nc_settings_diagnosis_title),
+                            menuItems
+                        )
+                    },
+                    content = { paddingValues ->
+                        val viewState = diagnosisViewModel.notificationViewState.collectAsState().value
 
-                            Column(
-                                Modifier
-                                    .background(backgroundColor)
-                                    .padding(
-                                        0.dp,
-                                        paddingValues.calculateTopPadding(),
-                                        0.dp,
-                                        paddingValues.calculateBottomPadding()
-                                    )
-                                    .fillMaxSize()
-                            ) {
-                                DiagnosisContentComposable(
-                                    diagnosisDataState,
-                                    isLoading = diagnosisViewModel.isLoading.value,
-                                    showDialog = diagnosisViewModel.showDialog.value,
-                                    viewState = viewState,
-                                    onTestPushClick = { diagnosisViewModel.fetchTestPushResult() },
-                                    onDismissDialog = { diagnosisViewModel.dismissDialog() },
-                                    showTestPushButton = isGooglePlayServicesAvailable ||
-                                        useUnifiedPush ||
-                                        useEmbeddedDistrib,
-                                    isOnline = isOnline
+                        Column(
+                            Modifier
+                                .background(backgroundColor)
+                                .padding(
+                                    0.dp,
+                                    paddingValues.calculateTopPadding(),
+                                    0.dp,
+                                    paddingValues.calculateBottomPadding()
                                 )
-                            }
+                                .fillMaxSize()
+                        ) {
+                            DiagnosisContentComposable(
+                                diagnosisDataState,
+                                isLoading = diagnosisViewModel.isLoading.value,
+                                showDialog = diagnosisViewModel.showDialog.value,
+                                viewState = viewState,
+                                onTestPushClick = { diagnosisViewModel.fetchTestPushResult() },
+                                onDismissDialog = { diagnosisViewModel.dismissDialog() },
+                                showTestPushButton = isGooglePlayServicesAvailable ||
+                                    useUnifiedPush ||
+                                    useEmbeddedDistrib,
+                                isOnline = isOnline
+                            )
                         }
-                    )
-                }
+                    }
+                )
             }
         }
     }
