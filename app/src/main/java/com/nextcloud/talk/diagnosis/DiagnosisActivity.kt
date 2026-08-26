@@ -34,7 +34,7 @@ import com.nextcloud.talk.application.NextcloudTalkApplication
 import com.nextcloud.talk.arbitrarystorage.ArbitraryStorageManager
 import com.nextcloud.talk.components.ColoredStatusBar
 import com.nextcloud.talk.components.StandardAppBar
-import com.nextcloud.talk.data.network.NetworkMonitor
+import com.nextcloud.talk.components.StatusBannerRow
 import com.nextcloud.talk.logger.LogsRepository
 import com.nextcloud.talk.users.UserManager
 import com.nextcloud.talk.utils.ClosedInterfaceImpl
@@ -56,9 +56,6 @@ class DiagnosisActivity : BaseActivity() {
 
     @Inject
     lateinit var userManager: UserManager
-
-    @Inject
-    lateinit var networkMonitor: NetworkMonitor
 
     @Inject
     lateinit var platformPermissionUtil: PlatformPermissionUtil
@@ -93,46 +90,50 @@ class DiagnosisActivity : BaseActivity() {
                 colorScheme = colorScheme
             ) {
                 val isOnline = networkMonitor.isOnline.collectAsState().value
+                val isMaintenanceMode = maintenanceModeFlow.collectAsState().value
                 ColoredStatusBar()
-                Scaffold(
-                    modifier = Modifier
-                        .statusBarsPadding()
-                        .displayCutoutPadding(),
-                    topBar = {
-                        StandardAppBar(
-                            title = stringResource(R.string.nc_settings_diagnosis_title),
-                            menuItems
-                        )
-                    },
-                    content = { paddingValues ->
-                        val viewState = diagnosisViewModel.notificationViewState.collectAsState().value
-
-                        Column(
-                            Modifier
-                                .background(backgroundColor)
-                                .padding(
-                                    0.dp,
-                                    paddingValues.calculateTopPadding(),
-                                    0.dp,
-                                    paddingValues.calculateBottomPadding()
-                                )
-                                .fillMaxSize()
-                        ) {
-                            DiagnosisContentComposable(
-                                diagnosisDataState,
-                                isLoading = diagnosisViewModel.isLoading.value,
-                                showDialog = diagnosisViewModel.showDialog.value,
-                                viewState = viewState,
-                                onTestPushClick = { diagnosisViewModel.fetchTestPushResult() },
-                                onDismissDialog = { diagnosisViewModel.dismissDialog() },
-                                showTestPushButton = isGooglePlayServicesAvailable ||
-                                    useUnifiedPush ||
-                                    useEmbeddedDistrib,
-                                isOnline = isOnline
+                Column {
+                    StatusBannerRow(isOffline = !isOnline, isMaintenanceMode = isMaintenanceMode)
+                    Scaffold(
+                        modifier = Modifier
+                            .statusBarsPadding()
+                            .displayCutoutPadding(),
+                        topBar = {
+                            StandardAppBar(
+                                title = stringResource(R.string.nc_settings_diagnosis_title),
+                                menuItems
                             )
+                        },
+                        content = { paddingValues ->
+                            val viewState = diagnosisViewModel.notificationViewState.collectAsState().value
+
+                            Column(
+                                Modifier
+                                    .background(backgroundColor)
+                                    .padding(
+                                        0.dp,
+                                        paddingValues.calculateTopPadding(),
+                                        0.dp,
+                                        paddingValues.calculateBottomPadding()
+                                    )
+                                    .fillMaxSize()
+                            ) {
+                                DiagnosisContentComposable(
+                                    diagnosisDataState,
+                                    isLoading = diagnosisViewModel.isLoading.value,
+                                    showDialog = diagnosisViewModel.showDialog.value,
+                                    viewState = viewState,
+                                    onTestPushClick = { diagnosisViewModel.fetchTestPushResult() },
+                                    onDismissDialog = { diagnosisViewModel.dismissDialog() },
+                                    showTestPushButton = isGooglePlayServicesAvailable ||
+                                        useUnifiedPush ||
+                                        useEmbeddedDistrib,
+                                    isOnline = isOnline
+                                )
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
     }
