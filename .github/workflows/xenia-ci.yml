@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: 2026 Krateos BV
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: Xenia CI (unsigned)
+
+on:
+  workflow_dispatch:
+
+# Declare default permissions as read only.
+permissions: read-all
+
+concurrency:
+  group: xenia-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: "temurin"
+          java-version: 21
+
+      - name: Gradle validate
+        uses: gradle/actions/wrapper-validation@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      - name: Build unsigned debug APK (generic flavor)
+        run: |
+          echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" >> gradle.properties
+          ./gradlew --no-daemon assembleGenericDebug
+
+      - name: Archive unsigned APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() }}
+        with:
+          name: talk-android-unsigned-debug
+          path: app/build/outputs/apk/generic/debug/*.apk
+          retention-days: 5
