@@ -1,5 +1,5 @@
 <!--
-  ~ Nextcloud Talk - Android Client
+  ~ Xenia Talk - Android Client (XNT-60 rebrand)
   ~
   ~ SPDX-FileCopyrightText: 2017-2020 Mario Danic <mario@lovelyhq.com>
   ~ SPDX-License-Identifier: GPL-3.0-or-later
@@ -11,18 +11,15 @@
     android:viewportWidth="108"
     android:viewportHeight="108"
     android:autoMirrored="true">
-  <group android:scaleX="0.08035714"
-      android:scaleY="0.08035714">
-      <path android:fillType="evenOdd"
-          android:pathData="M0,0h1344v1344h-1344z" android:strokeLineJoin="round">
-          <aapt:attr name="android:fillColor">
-              <gradient android:endX="1343.9999"
-                  android:endY="1.2959057E-4" android:startX="163.34073"
-                  android:startY="1344.0002" android:type="linear">
-                  <item android:color="#FF0082C9" android:offset="0"/>
-                  <item android:color="#FF1CAFFF" android:offset="1"/>
-              </gradient>
-          </aapt:attr>
-      </path>
-  </group>
+    <path android:fillType="evenOdd"
+        android:pathData="M0,0h108v108h-108z" android:strokeLineJoin="round">
+        <aapt:attr name="android:fillColor">
+            <gradient android:endX="54"
+                android:endY="75.6" android:startX="54"
+                android:startY="0" android:type="linear">
+                <item android:color="#FF001233" android:offset="0"/>
+                <item android:color="#FF003399" android:offset="1"/>
+            </gradient>
+        </aapt:attr>
+    </path>
 </vector>

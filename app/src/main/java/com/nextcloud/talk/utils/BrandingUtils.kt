@@ -9,8 +9,7 @@ package com.nextcloud.talk.utils
 import android.content.Context
 
 object BrandingUtils {
-    private const val ORIGINAL_NEXTCLOUD_TALK_APPLICATION_ID = "com.nextcloud.talk2"
-
-    fun isOriginalNextcloudClient(context: Context): Boolean =
-        context.packageName.equals(ORIGINAL_NEXTCLOUD_TALK_APPLICATION_ID)
+    // This fork intentionally kept upstream's applicationId (com.nextcloud.talk2), so a
+    // packageName comparison can no longer distinguish it from the real Nextcloud Talk client.
+    fun isOriginalNextcloudClient(context: Context): Boolean = false
 }
