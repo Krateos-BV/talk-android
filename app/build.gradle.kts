@@ -82,15 +82,15 @@ android {
     productFlavors {
         // used for f-droid
         create("generic") {
-            applicationId = "com.nextcloud.talk2"
+            applicationId = "eu.xeniacloud.talk"
             dimension = "default"
         }
         create("gplay") {
-            applicationId = "com.nextcloud.talk2"
+            applicationId = "eu.xeniacloud.talk"
             dimension = "default"
         }
         create("qa") {
-            applicationId = "com.nextcloud.talk2.qa"
+            applicationId = "eu.xeniacloud.talk.qa"
             dimension = "default"
             versionCode = 1
             versionName = "1"

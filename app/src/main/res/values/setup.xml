@@ -22,7 +22,7 @@
     <bool name="hide_provider">false</bool>
     <bool name="hide_auth_cert">false</bool>
     <bool name="multiaccount_support">true</bool>
-    <string name="weblogin_url" translatable="false"></string>
+    <string name="weblogin_url" translatable="false">https://portal.xeniacloud.eu</string>
     <string name="nc_report_email" translatable="false">android@nextcloud.com</string>
     <!-- Flags to auto enable/disable some features -->
     <bool name="is_branded_client">true</bool>

@@ -13,7 +13,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:layout_gravity="center"
-    android:background="@color/colorPrimary"
+    android:background="@drawable/bg_xenia_gradient"
     android:fillViewport="true"
     android:orientation="vertical">
 

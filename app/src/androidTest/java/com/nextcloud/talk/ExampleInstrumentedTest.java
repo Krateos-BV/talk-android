@@ -30,6 +30,6 @@ public class ExampleInstrumentedTest {
         Context appContext = InstrumentationRegistry.getTargetContext();
 
         assertNotNull(appContext.getPackageName());
-        assertTrue("The package name must start with 'com.nextcloud.talk2'", appContext.getPackageName().startsWith("com.nextcloud.talk2"));
+        assertTrue("The package name must start with 'eu.xeniacloud.talk'", appContext.getPackageName().startsWith("eu.xeniacloud.talk"));
     }
 }
