@@ -77,16 +77,16 @@ fun PinnedMessageView(
 
     val pinnedHeadline = if (message.pinnedActorId != message.actorId) {
         if (message.pinnedActorId == currentConversation?.actorId) {
-            stringResource(R.string.pinned_by_you, message.actorDisplayName.orEmpty())
+            stringResource(R.string.pinned_by_you, message.getNullsafeActorDisplayName())
         } else {
             stringResource(
                 R.string.pinned_by_author,
-                message.actorDisplayName.orEmpty(),
+                message.getNullsafeActorDisplayName(),
                 message.pinnedActorDisplayName.orEmpty()
             )
         }
     } else {
-        "${message.actorDisplayName}"
+        message.getNullsafeActorDisplayName()
     }
 
     val context = LocalContext.current
@@ -100,7 +100,7 @@ fun PinnedMessageView(
             message = message.getRichText(),
             plainMessage = message.message.orEmpty(),
             renderMarkdown = message.renderMarkdown == true,
-            actorDisplayName = message.actorDisplayName.orEmpty(),
+            actorDisplayName = message.getNullsafeActorDisplayName(),
             isThread = false,
             threadTitle = "",
             threadReplies = 0,
@@ -179,7 +179,8 @@ fun PinnedMessageView(
                     textColor = colorScheme.onSurface,
                     modifier = Modifier
                         .heightIn(max = 80.dp)
-                        .verticalScroll(scrollState)
+                        .verticalScroll(scrollState),
+                    onClick = { scrollToMessageWithIdWithOffset(message.jsonMessageId.toString()) }
                 )
             }
             Column {

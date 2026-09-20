@@ -151,12 +151,15 @@
     <string name="nc_call_button_content_description_microphone">Växla mikrofon</string>
     <string name="nc_call_button_content_description_pip">Öppna bild i bild-läge</string>
     <string name="nc_call_button_content_description_switch_to_self_vide">Växla till egen video</string>
+    <string name="nc_call_e2ee_not_supported">Samtal stöds för närvarande inte eftersom end-to-end-kryptering är aktiverad på servern.</string>
+    <string name="nc_call_e2ee_not_supported_title">Samtal från %s är inte tillgängligt</string>
     <string name="nc_call_incoming">INKOMMANDE</string>
     <string name="nc_call_join_failed">Det gick inte att ansluta till samtalet. Försök igen.</string>
     <string name="nc_call_name">Samtalsnamn</string>
     <string name="nc_call_notifications">Samtalsaviseringar</string>
     <string name="nc_call_ongoing_notification_content">Tryck för att återvända till ditt samtal.</string>
     <string name="nc_call_ongoing_notification_default_title">Samtal pågår</string>
+    <string name="nc_call_ongoing_notification_end_action">Avsluta samtal</string>
     <string name="nc_call_raised_hand">%1$s räckte upp handen</string>
     <string name="nc_call_reconnecting">Återansluter …</string>
     <string name="nc_call_ringing">RINGER</string>
@@ -181,6 +184,7 @@
     <string name="nc_channel_only_moderators_can_post">Endast moderatorer kan skriva i den här kanalen</string>
     <string name="nc_chat_no_messages">Inga meddelanden än</string>
     <string name="nc_classified_conversation">Klassificerad konversation</string>
+    <string name="nc_classified_conversation_description">Låst konversation för konfidentiella ämnen; offentlig åtkomst, gäster, SIP och inspelningar är inaktiverade</string>
     <string name="nc_clear_edit_button">Avbryt redigering</string>
     <string name="nc_clear_history">Radera alla meddelanden</string>
     <string name="nc_clear_history_success">Alla meddelanden raderades</string>
@@ -207,6 +211,10 @@
     <string name="nc_confirm">Bekräfta</string>
     <string name="nc_connecting_call">Ansluter…</string>
     <string name="nc_contacts_done">Färdig</string>
+    <string name="nc_conversation_created_invalid_participants">Vissa deltagare kunde inte läggas till</string>
+    <string name="nc_conversation_created_invalid_participants_named">Det gick inte att lägga till följande deltagare: %1$s</string>
+    <string name="nc_conversation_created_public">Gäster kan ansluta till den här konversationen via dess länk. Dela den nu eller senare från konversationsinställningarna.</string>
+    <string name="nc_conversation_created_title">Konversation skapad</string>
     <string name="nc_conversation_description">Konversationsbeskrivning</string>
     <string name="nc_conversation_menu_conversation_go_to_file">Gå till fil</string>
     <string name="nc_conversation_menu_conversation_info">Konversationsinfo</string>
@@ -229,10 +237,20 @@
     <string name="nc_conversation_tags_new">Ny tagg</string>
     <string name="nc_conversation_tags_rename">Byt namn på tagg</string>
     <string name="nc_conversation_tags_save">Spara</string>
+    <string name="nc_conversation_type_defaults">Standardinställningar för den här konversationstypen:</string>
+    <string name="nc_conversation_type_defaults_hint">Dessa inställningar kan ändras när konversationen har skapats</string>
+    <string name="nc_conversation_type_lobby">Lobby aktiverad; konversationen begränsas till moderatorer</string>
+    <string name="nc_conversation_type_mentions_moderators">Endast moderatorer får nämna alla</string>
+    <string name="nc_conversation_type_message_expiration">Meddelanden förfaller efter %1$s</string>
+    <string name="nc_conversation_type_message_expiration_custom">Anpassad meddelandeutgång är aktiverad</string>
+    <string name="nc_conversation_type_sip">Telefon- och SIP-inringning är aktiverad</string>
+    <string name="nc_conversation_type_sip_no_pin">Inringning utan PIN-kod tillåts</string>
+    <string name="nc_conversation_types_error">Kunde inte läsa in konversationstyper</string>
     <string name="nc_conversations_empty">Anslut till en konversation eller starta en ny</string>
     <string name="nc_conversations_empty_details">Säg hej till dina vänner och kollegor!</string>
     <string name="nc_copy_message">Kopia</string>
     <string name="nc_copy_message_link">Kopiera meddelandelänk</string>
+    <string name="nc_copy_password">Kopiera lösenord</string>
     <string name="nc_create_new_conversation">Skapa en ny konversation</string>
     <string name="nc_create_poll">Skapa omröstning</string>
     <string name="nc_custom_color">Anpassad färg</string>
@@ -246,6 +264,7 @@
     <string name="nc_delete_message_leaked_to_matterbridge">Meddelandet har raderats, men kan ha läckt till andra tjänster</string>
     <string name="nc_delete_now">Ta bort nu</string>
     <string name="nc_deleted_user">Användare %1$s togs bort</string>
+    <string name="nc_deleted_user_display_name">Borttagen användare</string>
     <string name="nc_demote">Degradera från moderator</string>
     <string name="nc_demote_owner_to_moderator">Nedgradera från ägare till moderator</string>
     <string name="nc_demote_owner_to_participant">Nedgradera från ägare till deltagare</string>
@@ -420,6 +439,7 @@
     <string name="nc_offline">För närvarande frånkopplad, kontrollera din anslutning</string>
     <string name="nc_ok">OK</string>
     <string name="nc_ongoing_meeting">Pågående möte</string>
+    <string name="nc_open_conversation">Öppen konversation</string>
     <string name="nc_open_conversation_to_registered_users">Öppna konversation för registrerade användare</string>
     <string name="nc_open_to_guest_app_users">Även öppen för gästappanvändare</string>
     <string name="nc_owner">Ägare</string>
@@ -427,6 +447,9 @@
     <string name="nc_participants">Deltagare</string>
     <string name="nc_participants_add">Lägg till deltagare</string>
     <string name="nc_password">Lösenord</string>
+    <string name="nc_password_copied">Lösenordet kopierat</string>
+    <string name="nc_password_required">Den här servern kräver ett lösenord för konversationer som gäster kan delta i</string>
+    <string name="nc_password_secure">Lösenordet är säkert.</string>
     <string name="nc_permissions_ask">Ange behörigheter</string>
     <string name="nc_permissions_denied">Vissa behörigheter nekades.</string>
     <string name="nc_permissions_rationale_dialog_title">Tillåt behörigheter</string>
@@ -437,6 +460,8 @@
     <string name="nc_pip_microphone_mute">Stäng av mikrofon</string>
     <string name="nc_pip_microphone_unmute">Aktivera mikrofon</string>
     <string name="nc_plain_old_messages">Meddelanden</string>
+    <string name="nc_presentation">Presentation</string>
+    <string name="nc_presentation_description">Begränsad konversation för interna presentationer</string>
     <string name="nc_profile_personal_info_title">Personlig information</string>
     <string name="nc_promote">Befordra till moderator</string>
     <string name="nc_promote_to_owner">Befordra till ägare</string>
@@ -461,6 +486,7 @@
     <string name="nc_reply_to_thread">Svara i tråd: %1$s</string>
     <string name="nc_reschedule_message_with_notification">Ändra schemaläggning med avisering</string>
     <string name="nc_reschedule_message_without_notification">Ändra schemaläggning utan avisering</string>
+    <string name="nc_retry">Försök igen</string>
     <string name="nc_room_retention">Rummet har behållits framgångsrikt</string>
     <string name="nc_save_message">Spara</string>
     <string name="nc_save_success">Sparad</string>
@@ -611,6 +637,7 @@
     <string name="nc_test_results">Testresultat</string>
     <string name="nc_today_meeting">Idag kl. %1$s</string>
     <string name="nc_tomorrow_meeting">Imorgon kl. %1$s</string>
+    <string name="nc_undo">Ångra</string>
     <string name="nc_upcoming_event_dismissed">Kommande samtal kan visas i konversationsinformationen</string>
     <string name="nc_upload_choose_local_files">Välj filer</string>
     <string name="nc_upload_confirm_send_multiple">Skicka dessa filer till %1$s?</string>
@@ -630,6 +657,7 @@
     <string name="nc_voice_message_missing_audio_permission">Tillstånd för ljudinspelning krävs</string>
     <string name="nc_voice_message_slide_to_cancel">« Dra för att avbryta</string>
     <string name="nc_webinar">Webbinarium</string>
+    <string name="nc_webinar_description">Begränsad konversation med lobby aktiverad, idealisk för offentliga webbseminarier</string>
     <string name="nc_yes">Ja</string>
     <string name="nc_zoom_in">Zooma in</string>
     <string name="nc_zoom_out">Zooma ut</string>
