@@ -10,16 +10,28 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import android.view.LayoutInflater
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.AlertDialog as ComposeAlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentTransaction
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -27,7 +39,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
-import androidx.work.OutOfQuotaPolicy
+import com.nextcloud.talk.utils.setExpeditedIfSupported
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import autodagger.AutoInjector
@@ -54,7 +66,6 @@ import com.nextcloud.talk.conversationinfo.viewmodel.ConversationInfoViewModel
 import com.nextcloud.talk.conversationinfoedit.ConversationInfoEditActivity
 import com.nextcloud.talk.data.user.model.User
 import com.nextcloud.talk.databinding.DialogBanParticipantBinding
-import com.nextcloud.talk.databinding.DialogPasswordBinding
 import com.nextcloud.talk.events.EventStatus
 import com.nextcloud.talk.extensions.getParcelableArrayListExtraProvider
 import com.nextcloud.talk.extensions.getParcelableExtraProvider
@@ -70,6 +81,9 @@ import com.nextcloud.talk.models.json.participants.Participant
 import com.nextcloud.talk.models.json.participants.Participant.ActorType.CIRCLES
 import com.nextcloud.talk.models.json.participants.Participant.ActorType.GROUPS
 import com.nextcloud.talk.models.json.upcomingEvents.UpcomingEvent
+import com.nextcloud.talk.passwordpolicy.PasswordPolicyField
+import com.nextcloud.talk.passwordpolicy.PasswordValidationState
+import com.nextcloud.talk.passwordpolicy.isPasswordAccepted
 import com.nextcloud.talk.shareditems.activities.SharedItemsActivity
 import com.nextcloud.talk.threadsoverview.ThreadsOverviewActivity
 import com.nextcloud.talk.ui.dialog.DialogBanListFragment
@@ -82,6 +96,7 @@ import com.nextcloud.talk.utils.ShareUtils
 import com.nextcloud.talk.utils.ShortcutManagerHelper
 import com.nextcloud.talk.utils.bundle.BundleKeys
 import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_ROOM_TOKEN
+import com.nextcloud.talk.utils.copyPasswordToClipboard
 import io.reactivex.Observer
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
@@ -239,18 +254,69 @@ class ConversationInfoActivity : BaseActivity() {
                 }
             }
 
+            var passwordRequest by remember { mutableStateOf<PasswordRequest?>(null) }
+
             MaterialTheme(colorScheme = colorScheme) {
                 ColoredStatusBar()
                 ConversationInfoScreen(
                     state = uiState,
-                    callbacks = buildCallbacks()
+                    callbacks = buildCallbacks(onPasswordRequest = { passwordRequest = it })
                 )
+                passwordRequest?.let { request ->
+                    val validationState by viewModel.passwordValidation.state.collectAsStateWithLifecycle()
+                    GuestAccessPasswordDialog(
+                        validationState = validationState,
+                        onPasswordChanged = viewModel.passwordValidation::validate,
+                        onDismiss = {
+                            passwordRequest = null
+                            viewModel.passwordValidation.reset()
+                        },
+                        onSave = { password, copyAfterSave ->
+                            onGuestPasswordSave(request, password, copyAfterSave)
+                            passwordRequest = null
+                            viewModel.passwordValidation.reset()
+                        }
+                    )
+                }
             }
         }
     }
 
+    private fun onGuestPasswordSave(request: PasswordRequest, password: String, copyAfterSave: Boolean) {
+        val user = conversationUser ?: return
+        if (copyAfterSave) {
+            copyPassword(password)
+        }
+        when (request) {
+            PasswordRequest.SET -> {
+                val apiVersion = ApiUtils.getConversationApiVersion(user, intArrayOf(ApiUtils.API_V4, ApiUtils.API_V1))
+                viewModel.setPassword(
+                    user = user,
+                    url = ApiUtils.getUrlForRoomPassword(apiVersion, user.baseUrl!!, conversationToken),
+                    password = password
+                )
+            }
+            PasswordRequest.ALLOW_GUESTS -> viewModel.allowGuests(user, conversationToken, true, password)
+        }
+    }
+
+    private fun isPasswordEnforced(): Boolean =
+        CapabilitiesUtil.isPasswordEnforced(viewModel.uiState.value.spreedCapabilities)
+
+    private fun showSnackbar(@StringRes messageRes: Int) {
+        lifecycleScope.launch { viewModel.emitSnackbar(messageRes) }
+    }
+
+    private fun copyPassword(password: String) {
+        copyPasswordToClipboard(
+            context = this,
+            label = resources.getString(R.string.nc_app_product_name),
+            password = password
+        )
+    }
+
     @Suppress("LongMethod", "CyclomaticComplexMethod")
-    private fun buildCallbacks() =
+    private fun buildCallbacks(onPasswordRequest: (PasswordRequest) -> Unit) =
         ConversationInfoScreenCallbacks(
             onNavigateBack = { onBackPressedDispatcher.onBackPressed() },
             onEditConversation = {
@@ -274,11 +340,19 @@ class ConversationInfoActivity : BaseActivity() {
             onLobbyTimerClick = { showLobbyTimerDialog() },
             onAllowGuestsClick = {
                 val user = conversationUser ?: return@ConversationInfoScreenCallbacks
-                viewModel.allowGuests(user, conversationToken, !viewModel.uiState.value.guestsAllowed)
+                val state = viewModel.uiState.value
+                val allow = !state.guestsAllowed
+                if (allow && isPasswordEnforced() && !state.hasPassword) {
+                    onPasswordRequest(PasswordRequest.ALLOW_GUESTS)
+                } else {
+                    viewModel.allowGuests(user, conversationToken, allow)
+                }
             },
             onPasswordProtectionClick = {
                 val user = conversationUser ?: return@ConversationInfoScreenCallbacks
-                if (viewModel.uiState.value.hasPassword) {
+                if (!viewModel.uiState.value.hasPassword) {
+                    onPasswordRequest(PasswordRequest.SET)
+                } else {
                     val apiVersion =
                         ApiUtils.getConversationApiVersion(user, intArrayOf(ApiUtils.API_V4, ApiUtils.API_V1))
                     viewModel.setPassword(
@@ -286,8 +360,6 @@ class ConversationInfoActivity : BaseActivity() {
                         url = ApiUtils.getUrlForRoomPassword(apiVersion, user.baseUrl!!, conversationToken),
                         password = ""
                     )
-                } else {
-                    showPasswordDialog(conversationToken)
                 }
             },
             onResendInvitationsClick = {
@@ -472,6 +544,7 @@ class ConversationInfoActivity : BaseActivity() {
                 putParcelableArrayListExtra("selectedParticipants", existingParticipants)
                 putExtra(KEY_HIDE_ALREADY_EXISTING_PARTICIPANTS, true)
                 putExtra(BundleKeys.KEY_TOKEN, conversationToken)
+                putExtra(BundleKeys.KEY_ONLY_LOCAL_PARTICIPANTS, viewModel.uiState.value.isClassified)
             }
         )
     }
@@ -504,22 +577,43 @@ class ConversationInfoActivity : BaseActivity() {
         val addParticipantsWorker =
             OneTimeWorkRequest.Builder(AddParticipantsToConversationWorker::class.java)
                 .setInputData(data)
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                .setExpeditedIfSupported()
                 .build()
         WorkManager.getInstance().enqueue(addParticipantsWorker)
+        val names = autocompleteUsers.associate { it.id.orEmpty() to it.label.orEmpty() }
         WorkManager.getInstance(context).getWorkInfoByIdLiveData(addParticipantsWorker.id)
-            .observeForever { workInfo: WorkInfo? ->
-                if (workInfo?.state == WorkInfo.State.SUCCEEDED) {
-                    viewModel.loadParticipants(user, conversationToken)
+            .observe(this) { workInfo: WorkInfo? ->
+                when (workInfo?.state) {
+                    WorkInfo.State.SUCCEEDED -> {
+                        viewModel.loadParticipants(user, conversationToken)
+                        reportParticipantsNotAdded(workInfo.outputData, names)
+                    }
+                    WorkInfo.State.FAILED -> reportParticipantsNotAdded(workInfo.outputData, names)
+                    else -> { /* unused */ }
                 }
             }
+    }
+
+    private fun reportParticipantsNotAdded(outputData: Data, names: Map<String, String>) {
+        val failed = outputData
+            .getStringArray(AddParticipantsToConversationWorker.KEY_FAILED_PARTICIPANTS)
+            ?.map { names[it]?.takeIf(String::isNotEmpty) ?: it }
+            .orEmpty()
+        if (failed.isEmpty()) {
+            return
+        }
+        val message = getString(
+            R.string.nc_conversation_created_invalid_participants_named,
+            failed.joinToString(", ")
+        )
+        lifecycleScope.launch { viewModel.emitSnackbar(message) }
     }
 
     private fun leaveConversation() {
         workerData?.let { data ->
             val workRequest = OneTimeWorkRequest.Builder(LeaveConversationWorker::class.java)
                 .setInputData(data)
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                .setExpeditedIfSupported()
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(
                 "leave_conversation_work",
@@ -594,7 +688,7 @@ class ConversationInfoActivity : BaseActivity() {
             WorkManager.getInstance(context).enqueue(
                 OneTimeWorkRequest.Builder(DeleteConversationWorker::class.java)
                     .setInputData(it)
-                    .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                    .setExpeditedIfSupported()
                     .build()
             )
 
@@ -611,31 +705,6 @@ class ConversationInfoActivity : BaseActivity() {
                 Intent(context, MainActivity::class.java).apply { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP) }
             )
         }
-    }
-
-    private fun showPasswordDialog(token: String) {
-        val user = conversationUser ?: return
-        val dialogPassword = DialogPasswordBinding.inflate(LayoutInflater.from(this))
-        viewThemeUtils.platform.colorEditText(dialogPassword.password)
-        val builder = MaterialAlertDialogBuilder(this)
-            .setView(dialogPassword.root)
-            .setTitle(R.string.nc_guest_access_password_dialog_title)
-            .setPositiveButton(R.string.nc_ok) { _, _ ->
-                val apiVersion =
-                    ApiUtils.getConversationApiVersion(user, intArrayOf(ApiUtils.API_V4, ApiUtils.API_V1))
-                viewModel.setPassword(
-                    user = user,
-                    url = ApiUtils.getUrlForRoomPassword(apiVersion, user.baseUrl!!, token),
-                    password = dialogPassword.password.text.toString()
-                )
-            }
-            .setNegativeButton(R.string.nc_cancel, null)
-        viewThemeUtils.dialog.colorMaterialAlertDialogBackground(this, builder)
-        val dialog = builder.show()
-        viewThemeUtils.platform.colorTextButtons(
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE),
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
-        )
     }
 
     private fun toggleModeratorStatus(apiVersion: Int, participant: Participant) {
@@ -769,7 +838,7 @@ class ConversationInfoActivity : BaseActivity() {
         } else {
             R.string.nc_participant_type_change_failed
         }
-        lifecycleScope.launch { viewModel.emitSnackbar(messageRes) }
+        showSnackbar(messageRes)
     }
 
     /**
@@ -846,4 +915,61 @@ class ConversationInfoActivity : BaseActivity() {
         private const val PARTICIPANT_TYPE_MODERATOR: Int = 2
         private const val PARTICIPANT_TYPE_USER: Int = 3
     }
+}
+
+/**
+ * What a password the user is asked for is meant to do, since the same dialog serves both.
+ */
+private enum class PasswordRequest {
+    SET,
+    ALLOW_GUESTS
+}
+
+@Composable
+private fun GuestAccessPasswordDialog(
+    validationState: PasswordValidationState,
+    onPasswordChanged: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onSave: (password: String, copyAfterSave: Boolean) -> Unit
+) {
+    var password by remember { mutableStateOf("") }
+    val isPasswordValid = password.isNotBlank() && validationState.isPasswordAccepted
+
+    ComposeAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(id = R.string.nc_guest_access_password_dialog_title)) },
+        text = {
+            PasswordPolicyField(
+                password = password,
+                onPasswordChange = {
+                    password = it
+                    onPasswordChanged(it)
+                },
+                validationState = validationState,
+                label = stringResource(id = R.string.nc_guest_access_password_dialog_hint),
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(
+                    onClick = { onSave(password, true) },
+                    enabled = isPasswordValid
+                ) {
+                    Text(text = stringResource(R.string.nc_copy_password))
+                }
+                TextButton(
+                    onClick = { onSave(password, false) },
+                    enabled = isPasswordValid
+                ) {
+                    Text(text = stringResource(R.string.save))
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(id = R.string.nc_cancel))
+            }
+        }
+    )
 }

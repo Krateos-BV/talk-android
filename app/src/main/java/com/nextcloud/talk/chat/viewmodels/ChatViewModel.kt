@@ -19,6 +19,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
+import com.nextcloud.talk.R
 import com.nextcloud.talk.application.NextcloudTalkApplication
 import com.nextcloud.talk.arbitrarystorage.ArbitraryStorageManager
 import com.nextcloud.talk.chat.data.ChatMessageRepository
@@ -53,8 +54,6 @@ import com.nextcloud.talk.mediaviewer.model.MediaViewerItem
 import com.nextcloud.talk.messagesearch.MessageSearchHelper
 import com.nextcloud.talk.models.MessageDraft
 import com.nextcloud.talk.models.domain.ConversationModel
-import com.nextcloud.talk.models.domain.ReactionAddedModel
-import com.nextcloud.talk.models.domain.ReactionDeletedModel
 import com.nextcloud.talk.models.domain.SearchMessageEntry
 import com.nextcloud.talk.models.json.capabilities.SpreedCapability
 import com.nextcloud.talk.models.json.chat.ChatMessageJson
@@ -73,12 +72,14 @@ import com.nextcloud.talk.threadsoverview.data.ThreadsRepository
 import com.nextcloud.talk.ui.PlaybackSpeed
 import com.nextcloud.talk.utils.ApiUtils
 import com.nextcloud.talk.utils.CapabilitiesUtil.hasSpreedFeatureCapability
+import com.nextcloud.talk.utils.CharacterAvatarUtils
 import com.nextcloud.talk.utils.ConversationUtils
 import com.nextcloud.talk.utils.Mimetype
 import com.nextcloud.talk.utils.MimetypeUtils
 import com.nextcloud.talk.utils.ParticipantPermissions
 import com.nextcloud.talk.utils.SpreedFeatures
 import com.nextcloud.talk.utils.UserIdUtils
+import com.nextcloud.talk.utils.throttleLatest
 import com.nextcloud.talk.utils.bundle.BundleKeys
 import com.nextcloud.talk.utils.database.user.CurrentUserProvider
 import com.nextcloud.talk.utils.message.SendMessageUtils
@@ -125,6 +126,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import retrofit2.HttpException
@@ -331,6 +334,12 @@ class ChatViewModel @AssistedInject constructor(
     val noMoreSearchResults: MutableSharedFlow<Unit> = _noMoreSearchResults
 
     private var localLastReadMessage: Int = 0
+
+    /**
+     * Set once the user marked a message as unread, so the automatic read marker handling keeps its
+     * hands off the conversation for the rest of this visit.
+     */
+    private var keepMarkedAsUnread: Boolean = false
 
     private var showUnreadMessagesMarker: Boolean = true
     private var isLoadMoreInProgress = false
@@ -623,19 +632,12 @@ class ChatViewModel @AssistedInject constructor(
     val createRoomViewState: LiveData<ViewState>
         get() = _createRoomViewState
 
-    object ReactionAddedStartState : ViewState
-    class ReactionAddedSuccessState(val reactionAddedModel: ReactionAddedModel) : ViewState
+    enum class ReactionOperation { ADD, DELETE }
 
-    private val _reactionAddedViewState: MutableLiveData<ViewState> = MutableLiveData(ReactionAddedStartState)
-    val reactionAddedViewState: LiveData<ViewState>
-        get() = _reactionAddedViewState
+    private val _reactionFailures = MutableSharedFlow<ReactionOperation>(extraBufferCapacity = 1)
+    val reactionFailures: SharedFlow<ReactionOperation> = _reactionFailures
 
-    object ReactionDeletedStartState : ViewState
-    class ReactionDeletedSuccessState(val reactionDeletedModel: ReactionDeletedModel) : ViewState
-
-    private val _reactionDeletedViewState: MutableLiveData<ViewState> = MutableLiveData(ReactionDeletedStartState)
-    val reactionDeletedViewState: LiveData<ViewState>
-        get() = _reactionDeletedViewState
+    private val reactionLocks = mutableMapOf<Int, Mutex>()
 
     @Volatile private var firstUnreadMessageId: Int? = null
 
@@ -663,7 +665,12 @@ class ChatViewModel @AssistedInject constructor(
         val highlightedMessageId: Int? = null,
         val highlightedSearchTerm: String? = null,
         val highlightTriggerNonce: Long? = null,
-        val isInLobby: Boolean = false
+        val isInLobby: Boolean = false,
+        /**
+         * Set while the unread marker comes from the user marking a message as unread, so the chat does
+         * not scroll to a place they are already looking at.
+         */
+        val markedAsUnreadByUser: Boolean = false
     )
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -1272,7 +1279,7 @@ class ChatViewModel @AssistedInject constructor(
                 capabilities
             )
         }
-            .debounce(MESSAGES_REBUILD_DEBOUNCE_MS)
+            .throttleLatest(MESSAGES_REBUILD_WINDOW_MS)
             .map { input ->
                 val (
                     rawMessages,
@@ -1607,7 +1614,8 @@ class ChatViewModel @AssistedInject constructor(
                 isReactionsMessage(currentMessage) ||
                 isPollVotedMessage(currentMessage) ||
                 isEditMessage(currentMessage) ||
-                isThreadCreatedMessage(currentMessage)
+                isThreadCreatedMessage(currentMessage) ||
+                isUnpinnedMessage(currentMessage)
 
         val chatMessageMap = chatMessageList.associateBy { it.jsonMessageId }.toMutableMap()
         val chatMessageIterator = chatMessageMap.iterator()
@@ -1668,6 +1676,9 @@ class ChatViewModel @AssistedInject constructor(
     private fun isPollVotedMessage(currentMessage: MutableMap.MutableEntry<Int, ChatMessage>): Boolean =
         currentMessage.value.systemMessageType == ChatMessage.SystemMessageType.POLL_VOTED
 
+    private fun isUnpinnedMessage(currentMessage: MutableMap.MutableEntry<Int, ChatMessage>): Boolean =
+        currentMessage.value.systemMessageType == ChatMessage.SystemMessageType.MESSAGE_UNPINNED
+
     private fun handleThreadMessages(chatMessageList: List<ChatMessage>): List<ChatMessage> {
         fun isThreadChildMessage(currentMessage: MutableMap.MutableEntry<Int, ChatMessage>): Boolean =
             currentMessage.value.isThread &&
@@ -1691,8 +1702,12 @@ class ChatViewModel @AssistedInject constructor(
 
     // val timeString = DateUtils.getLocalTimeStringFromTimestamp(message.timestamp)
 
+    /**
+     * Avatar to request from the server for a message, empty for the actors the server has none for
+     * - those get their avatar drawn on the client instead, see [CharacterAvatarUtils].
+     */
     fun getAvatarUrl(message: ChatMessage): String =
-        if (this::currentUser.isInitialized) {
+        if (this::currentUser.isInitialized && !message.hasClientSideAvatar()) {
             ApiUtils.getUrlForAvatar(
                 currentUser.baseUrl,
                 message.actorId,
@@ -1701,6 +1716,9 @@ class ChatViewModel @AssistedInject constructor(
         } else {
             ""
         }
+
+    private fun ChatMessage.hasClientSideAvatar(): Boolean =
+        CharacterAvatarUtils.avatarFor(actorType, actorId, actorDisplayName, guestLabel = null) != null
 
     fun initData(user: User, credentials: String, urlForChatting: String, threadId: Long?) {
         currentUser = user
@@ -1746,19 +1764,24 @@ class ChatViewModel @AssistedInject constructor(
     fun getCapabilities(user: User, token: String, conversationModel: ConversationModel) {
         Log.d(TAG, "Remote server ${conversationModel.remoteServer}")
         if (conversationModel.remoteServer.isNullOrEmpty()) {
+            val spreedCapability = user.capabilities?.spreedCapability
+            if (spreedCapability == null) {
+                Log.w(TAG, "No local spreed capabilities available yet for user ${user.id}, skipping update")
+                return
+            }
             participantPermissions = ParticipantPermissions(
-                user.capabilities!!.spreedCapability!!,
+                spreedCapability,
                 conversationModel
             )
             if (_getCapabilitiesViewState.value == GetCapabilitiesStartState) {
                 _getCapabilitiesViewState.value = GetCapabilitiesInitialLoadState(
-                    user.capabilities!!.spreedCapability!!,
+                    spreedCapability,
                     conversationModel
                 )
             } else {
-                _getCapabilitiesViewState.value = GetCapabilitiesUpdateState(user.capabilities!!.spreedCapability!!)
+                _getCapabilitiesViewState.value = GetCapabilitiesUpdateState(spreedCapability)
             }
-            _spreedCapabilities.value = user.capabilities!!.spreedCapability!!
+            _spreedCapabilities.value = spreedCapability
         } else {
             chatNetworkDataSource.getCapabilities(user, token)
                 .subscribeOn(Schedulers.io())
@@ -1981,37 +2004,36 @@ class ChatViewModel @AssistedInject constructor(
     }
 
     fun deleteChatMessages(credentials: String, url: String, messageId: Int) {
-        chatNetworkDataSource.deleteChatMessage(credentials, url)
-            .subscribeOn(Schedulers.io())
-            ?.observeOn(AndroidSchedulers.mainThread())
-            ?.subscribe(object : Observer<ChatOverallSingleMessage> {
-                override fun onSubscribe(d: Disposable) {
-                    disposableSet.add(d)
-                }
+        val deletedPlaceholder = NextcloudTalkApplication.sharedApplication!!
+            .getString(R.string.message_deleted_by_you)
 
-                override fun onError(e: Throwable) {
-                    Log.e(
-                        TAG,
-                        "Something went wrong when trying to delete message with id " +
-                            messageId,
-                        e
-                    )
+        viewModelScope.launch {
+            val result = chatRepository.deleteChatMessage(
+                credentials,
+                url,
+                messageId.toLong(),
+                deletedPlaceholder
+            )
+
+            result
+                .onSuccess { message ->
+                    message?.let { _deleteChatMessageViewState.value = DeleteChatMessageSuccessState(it) }
+                }
+                .onFailure { throwable ->
+                    Log.e(TAG, "Something went wrong when trying to delete message with id $messageId", throwable)
                     _deleteChatMessageViewState.value = DeleteChatMessageErrorState
                 }
-
-                override fun onComplete() {
-                    // unused atm
-                }
-
-                override fun onNext(t: ChatOverallSingleMessage) {
-                    _deleteChatMessageViewState.value = DeleteChatMessageSuccessState(t)
-                }
-            })
+        }
     }
 
     fun advanceLocalLastReadMessageIfNeeded(messageId: Int) {
         Log.d(TAG, "advanceLocalLastReadMessageIfNeeded, messageId: $messageId")
         Log.d(TAG, "advanceLocalLastReadMessageIfNeeded, localLastReadMessage: $localLastReadMessage")
+
+        if (keepMarkedAsUnread) {
+            Log.d(TAG, "advanceLocalLastReadMessageIfNeeded, skipped: the chat was marked as unread")
+            return
+        }
 
         if (localLastReadMessage < messageId && -1 < messageId) {
             Log.d(TAG, "advanceLocalLastReadMessageIfNeeded, setting localLastReadMessage to $messageId")
@@ -2024,6 +2046,10 @@ class ChatViewModel @AssistedInject constructor(
      */
     fun updateRemoteLastReadMessageIfNeeded() {
         Log.d(TAG, "updateRemoteLastReadMessageIfNeeded, localLastReadMessage: $localLastReadMessage")
+        if (keepMarkedAsUnread) {
+            Log.d(TAG, "updateRemoteLastReadMessageIfNeeded, skipped: the chat was marked as unread")
+            return
+        }
         val conversationLastReadMessage = _uiState.value.conversation?.lastReadMessage ?: return
         Log.d(TAG, "updateRemoteLastReadMessageIfNeeded, conversation.lastReadMessage: $conversationLastReadMessage")
 
@@ -2050,10 +2076,41 @@ class ChatViewModel @AssistedInject constructor(
      * launched coroutine, previously left a real gap (observed at ~250ms, more under main-thread
      * contention) during which such a sync could see no pending marker yet and apply unguarded.
      */
+    /**
+     * Marks the chat as unread from [firstUnreadMessage] on: the read marker moves back to the message
+     * before it, the conversation entry is left unread until the server reports its own state, and the
+     * chat stops advancing the marker on its own for the rest of this visit - otherwise scrolling, or
+     * simply leaving the chat, would immediately mark everything read again.
+     */
+    fun markChatAsUnread(lastReadMessage: Int) {
+        if (!this::currentUser.isInitialized) {
+            return
+        }
+
+        keepMarkedAsUnread = true
+        localLastReadMessage = lastReadMessage
+        resetUnreadMarkerCache()
+        _uiState.update { it.copy(markedAsUnreadByUser = true) }
+
+        viewModelScope.launch {
+            chatRepository.updateLocalUnreadState(lastReadMessage)
+        }
+        ReadMarkerSyncWorker.enqueue(
+            context = NextcloudTalkApplication.sharedApplication!!.applicationContext,
+            userId = currentUser.id!!,
+            roomToken = chatRoomToken,
+            lastReadMessage = lastReadMessage
+        )
+    }
+
     fun setChatReadMessage(lastReadMessage: Int) {
         if (!this::currentUser.isInitialized) {
             return
         }
+        // marking as read is the explicit counterpart of marking as unread and hands the read marker
+        // back to the automatic handling
+        keepMarkedAsUnread = false
+        _uiState.update { it.copy(markedAsUnreadByUser = false) }
         chatRepository.markPendingReadMarker(lastReadMessage)
         viewModelScope.launch {
             chatRepository.updateLocalReadState(lastReadMessage)
@@ -2089,18 +2146,24 @@ class ChatViewModel @AssistedInject constructor(
             })
     }
 
-    suspend fun checkForNoteToSelf(credentials: String, baseUrl: String): ConversationModel? {
-        val response = chatNetworkDataSource.checkForNoteToSelf(credentials, baseUrl)
-        if (response.ocs?.meta?.statusCode == HTTP_CODE_OK) {
-            val noteToSelfConversation = ConversationModel.mapToConversationModel(
-                response.ocs?.data!!,
-                currentUser
-            )
-            return noteToSelfConversation
-        } else {
-            return null
+    suspend fun checkForNoteToSelf(credentials: String, baseUrl: String): ConversationModel? =
+        try {
+            val response = chatNetworkDataSource.checkForNoteToSelf(credentials, baseUrl)
+            if (response.ocs?.meta?.statusCode == HTTP_CODE_OK) {
+                ConversationModel.mapToConversationModel(
+                    response.ocs?.data!!,
+                    currentUser
+                )
+            } else {
+                null
+            }
+        } catch (e: IOException) {
+            Log.e(TAG, "checkForNoteToSelf I/O error: $e")
+            null
+        } catch (e: HttpException) {
+            Log.e(TAG, "checkForNoteToSelf HTTP error: $e")
+            null
         }
-    }
 
     fun shareLocationToNotes(credentials: String, url: String, objectType: String, objectId: String, metadata: String) {
         chatNetworkDataSource.shareLocationToNotes(credentials, url, objectType, objectId, metadata)
@@ -2126,35 +2189,24 @@ class ChatViewModel @AssistedInject constructor(
     }
 
     fun deleteReaction(roomToken: String, chatMessage: ChatMessage, emoji: String) {
-        val credentials = ApiUtils.getCredentials(currentUser.username, currentUser.token)
-        val url = ApiUtils.getUrlForMessageReaction(
-            baseUrl = currentUser.baseUrl!!,
-            roomToken = roomToken,
-            messageId = chatMessage.jsonMessageId.toString()
-        )
-
-        viewModelScope.launch {
-            try {
-                val model = reactionsRepository.deleteReaction(
-                    credentials,
-                    currentUser.id!!,
-                    url,
-                    roomToken,
-                    chatMessage,
-                    emoji
-                )
-                if (model.success) {
-                    _reactionDeletedViewState.value = ReactionDeletedSuccessState(model)
-                }
-            } catch (e: IOException) {
-                Log.d(TAG, "deleteReaction I/O error: $e")
-            } catch (e: HttpException) {
-                Log.d(TAG, "deleteReaction HTTP error: $e")
-            }
-        }
+        toggleReaction(roomToken, chatMessage, emoji, ReactionOperation.DELETE)
     }
 
     fun addReaction(roomToken: String, chatMessage: ChatMessage, emoji: String) {
+        toggleReaction(roomToken, chatMessage, emoji, ReactionOperation.ADD)
+    }
+
+    /**
+     * The repository renders the reaction locally before it calls the server, so operations on the same
+     * message and emoji are serialized: a second tap waits for the first one instead of racing it, which
+     * keeps the local state and the order of the requests in sync with what the user tapped.
+     */
+    private fun toggleReaction(
+        roomToken: String,
+        chatMessage: ChatMessage,
+        emoji: String,
+        operation: ReactionOperation
+    ) {
         val credentials = ApiUtils.getCredentials(currentUser.username, currentUser.token)
         val url = ApiUtils.getUrlForMessageReaction(
             baseUrl = currentUser.baseUrl!!,
@@ -2163,25 +2215,40 @@ class ChatViewModel @AssistedInject constructor(
         )
 
         viewModelScope.launch {
-            try {
-                val model = reactionsRepository.addReaction(
-                    credentials,
-                    currentUser.id!!,
-                    url,
-                    roomToken,
-                    chatMessage,
-                    emoji
-                )
-                if (model.success) {
-                    _reactionAddedViewState.value = ReactionAddedSuccessState(model)
+            reactionLockFor(chatMessage.jsonMessageId).withLock {
+                val succeeded = when (operation) {
+                    ReactionOperation.ADD -> reactionsRepository.addReaction(
+                        credentials,
+                        currentUser.id!!,
+                        url,
+                        roomToken,
+                        chatMessage,
+                        emoji
+                    ).success
+
+                    ReactionOperation.DELETE -> reactionsRepository.deleteReaction(
+                        credentials,
+                        currentUser.id!!,
+                        url,
+                        roomToken,
+                        chatMessage,
+                        emoji
+                    ).success
                 }
-            } catch (e: IOException) {
-                Log.d(TAG, "addReaction I/O error: $e")
-            } catch (e: HttpException) {
-                Log.d(TAG, "addReaction HTTP error: $e")
+
+                if (!succeeded) {
+                    Log.w(TAG, "Reaction $operation failed and was reverted")
+                    _reactionFailures.tryEmit(operation)
+                }
             }
         }
     }
+
+    /**
+     * Applying a reaction rewrites the whole cached message, so reactions of one message are serialized
+     * as a whole - locking per emoji would let two emojis of the same message overwrite each other.
+     */
+    private fun reactionLockFor(messageId: Int): Mutex = reactionLocks.getOrPut(messageId) { Mutex() }
 
     fun startAudioRecording(context: Context, currentConversation: ConversationModel) {
         audioFocusRequestManager.audioFocusRequest(true) {
@@ -2571,30 +2638,27 @@ class ChatViewModel @AssistedInject constructor(
         }
     }
 
-    fun pinMessage(credentials: String, url: String, pinUntil: Int = 0) {
+    fun pinMessage(credentials: String, url: String, messageId: Long, pinUntil: Int = 0) {
         viewModelScope.launch {
-            chatRepository.pinMessage(credentials, url, pinUntil).collect {
-                // UI is updated from room change observer
-                getRoom(chatRoomToken)
-            }
+            chatRepository.pinMessage(credentials, url, pinUntil, messageId)
+            // the banner already shows the local state, the refresh re-asserts the server's
+            getRoom(chatRoomToken)
         }
     }
 
-    fun unPinMessage(credentials: String, url: String) {
+    fun unPinMessage(credentials: String, url: String, messageId: Long) {
         viewModelScope.launch {
-            chatRepository.unPinMessage(credentials, url).collect {
-                // This updates the room if there are other pinned messages we need to show
-
-                getRoom(chatRoomToken)
-            }
+            chatRepository.unPinMessage(credentials, url, messageId)
+            // this updates the room if there are other pinned messages we need to show
+            getRoom(chatRoomToken)
         }
     }
 
-    fun hidePinnedMessage(credentials: String, url: String) {
+    fun hidePinnedMessage(credentials: String, url: String, messageId: Long) {
         viewModelScope.launch {
-            chatRepository.hidePinnedMessage(credentials, url).collect {
-                getRoom(chatRoomToken)
-            }
+            chatRepository.hidePinnedMessage(credentials, url, messageId)
+            // the banner already follows the local state, the refresh re-asserts the server's
+            getRoom(chatRoomToken)
         }
     }
 
@@ -2611,6 +2675,30 @@ class ChatViewModel @AssistedInject constructor(
 
     companion object {
         private val TAG = ChatViewModel::class.java.simpleName
+
+        /**
+         * Returns the read marker that makes [messageId] the first unread message: the id of the
+         * message right before it, or 0 when it is the oldest message there is, which marks the whole
+         * conversation as unread. Returns null when the message is not part of [items] at all.
+         *
+         * [items] run newest first, the way the chat list renders them bottom-up, so the message before
+         * the selected one is the next id in that order. Date headers and markers carry no message and
+         * are skipped; a media group carries several, its own messages ordered oldest last.
+         */
+        internal fun readMarkerForMarkingUnread(items: List<ChatItem>, messageId: Int): Int? {
+            val newestFirstIds = items.flatMap { item ->
+                when (item) {
+                    is ChatItem.MessageItem -> listOf(item.uiMessage.id)
+                    is ChatItem.MediaGroupItem -> item.messages.map { it.id }.asReversed()
+                    else -> emptyList()
+                }
+            }
+
+            val selectedIndex = newestFirstIds.indexOf(messageId)
+            if (selectedIndex < 0) return null
+
+            return newestFirstIds.getOrNull(selectedIndex + 1) ?: 0
+        }
 
         /**
          * Returns the id of the first unread message, or null when it cannot be determined (yet).
@@ -2636,7 +2724,7 @@ class ChatViewModel @AssistedInject constructor(
         private const val WEBSOCKET_CONNECT_TIMEOUT_MS = 3000L
         private const val WEBSOCKET_POLL_INTERVAL_MS = 50L
         private const val ROOM_REFRESH_DEBOUNCE_MS = 500L
-        private const val MESSAGES_REBUILD_DEBOUNCE_MS = 200L
+        private const val MESSAGES_REBUILD_WINDOW_MS = 200L
         private const val LOBBY_POLLING_INTERVAL_MS = 5_000L
         private const val GROUPING_TIME_WINDOW_SECONDS = 300L
         private const val TIMESTAMP_TO_MILLIS = 1000L
