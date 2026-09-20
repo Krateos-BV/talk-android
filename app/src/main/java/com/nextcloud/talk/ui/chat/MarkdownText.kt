@@ -51,9 +51,13 @@ import androidx.core.content.ContextCompat
 import coil.imageLoader
 import coil.request.ImageRequest
 import coil.transform.CircleCropTransformation
+import com.nextcloud.talk.R
 import com.nextcloud.talk.chat.ui.model.ChatMessageUi
 import com.nextcloud.talk.events.UserMentionClickEvent
 import com.nextcloud.talk.ui.theme.LocalViewThemeUtils
+import com.nextcloud.talk.ui.toDrawable
+import com.nextcloud.talk.utils.ActorAvatar
+import com.nextcloud.talk.utils.CharacterAvatarUtils
 import com.nextcloud.talk.utils.message.MessageUtils
 import io.noties.markwon.core.spans.LinkSpan
 import org.greenrobot.eventbus.EventBus
@@ -85,7 +89,8 @@ fun MarkdownText(
     modifier: Modifier = Modifier,
     maxLines: Int = Int.MAX_VALUE,
     textSizeSp: Float = TEXT_SIZE_SP,
-    highlightSearchTerm: String? = null
+    highlightSearchTerm: String? = null,
+    onClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val textColorArgb = textColor.toArgb()
@@ -218,6 +223,7 @@ fun MarkdownText(
                         textView.movementMethod = null
                         textView.setOnTouchListener(null)
                     }
+                    textView.setOnClickListener(onClick?.let { handler -> View.OnClickListener { handler() } })
                 }
             )
         }
@@ -312,7 +318,6 @@ private fun applyMentionChips(
         val fgColor = if (isSelfMention) selfChipTextColor else chipTextColor
         val avatarUrl = resolveMentionAvatarUrl(
             rawId = rawId,
-            name = name,
             type = type,
             mentionId = mentionId,
             isFederated = isFederated,
@@ -331,7 +336,7 @@ private fun applyMentionChips(
                 avatarUrl = avatarUrl
             )
         )
-        val fallbackDrawable = ContextCompat.getDrawable(context, fallbackIconRes)?.mutate() ?: continue
+        val fallbackDrawable = mentionFallbackDrawable(context, type, rawId, name, fallbackIconRes) ?: continue
         val token = "{$key}"
         var searchFrom = 0
         while (true) {
@@ -367,6 +372,24 @@ private fun applyMentionChips(
         }
     }
     return hasClickableChips
+}
+
+/**
+ * What the chip shows until - or instead of - an avatar arrives from the server: guests and email
+ * participants have none there, so theirs is drawn from their name rather than falling back to the
+ * generic person icon.
+ */
+@Suppress("LongParameterList")
+private fun mentionFallbackDrawable(
+    context: Context,
+    type: String,
+    rawId: String,
+    name: String,
+    fallbackIconRes: Int
+): Drawable? {
+    val character = CharacterAvatarUtils.avatarFor(type, rawId, name, context.getString(R.string.nc_guest))
+        as? ActorAvatar.Character
+    return character?.toDrawable(context) ?: ContextCompat.getDrawable(context, fallbackIconRes)?.mutate()
 }
 
 private class MentionClickSpan(private val mentionId: String) : ClickableSpan() {

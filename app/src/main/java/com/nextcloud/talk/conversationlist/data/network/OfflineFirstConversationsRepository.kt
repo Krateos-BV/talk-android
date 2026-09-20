@@ -26,9 +26,8 @@ import com.nextcloud.talk.models.domain.ConversationModel
 import com.nextcloud.talk.utils.ApiUtils
 import com.nextcloud.talk.utils.CapabilitiesUtil.isUserStatusAvailable
 import com.nextcloud.talk.utils.SpreedFeatures
-import io.reactivex.Observer
+import com.nextcloud.talk.utils.withRetry
 import io.reactivex.android.schedulers.AndroidSchedulers
-import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,7 +43,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import javax.inject.Inject
@@ -83,6 +81,10 @@ class OfflineFirstConversationsRepository @Inject constructor(
         get() = _conversationFlow
     private val _conversationFlow: MutableSharedFlow<ConversationModel> = MutableSharedFlow()
 
+    override val syncErrorFlow: Flow<Throwable>
+        get() = _syncErrorFlow
+    private val _syncErrorFlow: MutableSharedFlow<Throwable> = MutableSharedFlow()
+
     private val scope = CoroutineScope(Dispatchers.IO)
 
     sealed interface ConversationResult {
@@ -112,52 +114,41 @@ class OfflineFirstConversationsRepository @Inject constructor(
             }
         }
 
+    @Suppress("Detekt.TooGenericExceptionCaught")
     override fun getRoom(user: User, roomToken: String): Job =
         scope.launch {
-            chatNetworkDataSource.getRoom(user, roomToken)
-                .subscribeOn(Schedulers.io())
-                ?.observeOn(AndroidSchedulers.mainThread())
-                ?.subscribe(object : Observer<ConversationModel> {
-                    override fun onSubscribe(p0: Disposable) {
-                        // unused atm
-                    }
-
-                    override fun onError(e: Throwable) {
-                        runBlocking {
-                            // In case network is offline or call fails
-                            val id = user.id!!
-                            val model = getConversation(id, roomToken)
-                            if (model != null) {
-                                _conversationFlow.emit(model)
-                            } else {
-                                Log.e(TAG, "Conversation model not found on device database")
-                            }
-                        }
-                    }
-
-                    override fun onComplete() {
-                        // unused atm
-                    }
-
-                    override fun onNext(model: ConversationModel) {
-                        runBlocking {
-                            val existingEntity = dao.getConversationForUser(user.id!!, model.token).first()
-                            model.hiddenUpcomingEvent = existingEntity?.hiddenUpcomingEvent
-                            _conversationFlow.emit(model)
-                            val previous = existingEntity?.let { mapOf(it.internalId to it) }.orEmpty()
-                            val entityList = conversationListUpdater.preservePendingLocalState(
-                                previous,
-                                listOf(model.asEntity())
-                            )
-                            try {
-                                dao.upsertConversations(user.id!!, entityList)
-                            } catch (e: SQLiteConstraintException) {
-                                Log.w(TAG, "Skipping conversation upsert for removed account ${user.id}", e)
-                            }
-                        }
-                    }
-                })
+            try {
+                val model = chatNetworkDataSource.getRoom(user, roomToken)
+                val existingEntity = dao.getConversationForUser(user.id!!, model.token).first()
+                model.hiddenUpcomingEvent = existingEntity?.hiddenUpcomingEvent
+                _conversationFlow.emit(model)
+                val previous = existingEntity?.let { mapOf(it.internalId to it) }.orEmpty()
+                val entityList = conversationListUpdater.preservePendingLocalState(
+                    previous,
+                    listOf(model.asEntity())
+                )
+                try {
+                    dao.upsertConversations(user.id!!, entityList)
+                } catch (e: SQLiteConstraintException) {
+                    Log.w(TAG, "Skipping conversation upsert for removed account ${user.id}", e)
+                }
+            } catch (e: Exception) {
+                // In case network is offline, the call fails, or getRoom can't resolve a supported
+                // conversation API version (e.g. capabilities not loaded yet)
+                fallBackToLocalConversation(user, roomToken, e)
+            }
         }
+
+    private suspend fun fallBackToLocalConversation(user: User, roomToken: String, e: Throwable) {
+        Log.e(TAG, "Failed to fetch room $roomToken from server", e)
+        val id = user.id!!
+        val model = getConversation(id, roomToken)
+        if (model != null) {
+            _conversationFlow.emit(model)
+        } else {
+            Log.e(TAG, "Conversation model not found on device database")
+        }
+    }
 
     override suspend fun updateConversation(conversationModel: ConversationModel) {
         val entity = conversationModel.asEntity()
@@ -181,10 +172,16 @@ class OfflineFirstConversationsRepository @Inject constructor(
         val includeStatus = isUserStatusAvailable(user)
 
         try {
-            val conversationsList = network.getRooms(user, user.baseUrl!!, includeStatus)
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .blockingSingle()
+            val conversationsList = withRetry(
+                retries = NETWORK_FETCH_RETRIES,
+                initialDelayMillis = NETWORK_FETCH_RETRY_INITIAL_DELAY_MS,
+                maxDelayMillis = NETWORK_FETCH_RETRY_MAX_DELAY_MS
+            ) {
+                network.getRooms(user, user.baseUrl!!, includeStatus)
+                    .subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .blockingSingle()
+            }
 
             conversationsFromSync = conversationsList.map {
                 it.asEntity(user.id!!)
@@ -206,6 +203,10 @@ class OfflineFirstConversationsRepository @Inject constructor(
             scope.launch { catchUpRoomsWithNewMessages(user, roomsWithNewMessages) }
         } catch (e: Exception) {
             Log.e(TAG, "Something went wrong when fetching conversations", e)
+            val hasCachedConversations = dao.getConversationsForUser(user.id!!).first().isNotEmpty()
+            if (!hasCachedConversations) {
+                _syncErrorFlow.emit(e)
+            }
         }
         return conversationsFromSync
     }
@@ -340,5 +341,8 @@ class OfflineFirstConversationsRepository @Inject constructor(
         private const val CHAT_API_VERSION = 1
         private const val MAX_ROOMS_TO_CATCH_UP = 20
         private const val MAX_CONCURRENT_CATCH_UPS = 3
+        private const val NETWORK_FETCH_RETRIES = 3
+        private const val NETWORK_FETCH_RETRY_INITIAL_DELAY_MS = 1000L
+        private const val NETWORK_FETCH_RETRY_MAX_DELAY_MS = 8000L
     }
 }

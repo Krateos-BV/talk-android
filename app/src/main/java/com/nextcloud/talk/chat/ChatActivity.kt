@@ -92,7 +92,7 @@ import androidx.media3.session.SessionToken
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequest
-import androidx.work.OutOfQuotaPolicy
+import com.nextcloud.talk.utils.setExpeditedIfSupported
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import autodagger.AutoInjector
@@ -391,6 +391,7 @@ class ChatActivity :
     private lateinit var path: String
 
     var myFirstMessage: CharSequence? = null
+    private var isLeavingRoom: Boolean = false
 
     private var lastHandledHighlightNonce: Long? = null
     private var pendingHighlightedMessageId: Long? = null
@@ -513,6 +514,24 @@ class ChatActivity :
     private lateinit var messageInputFragment: MessageInputFragment
 
     val typingParticipants = HashMap<String, TypingParticipant>()
+
+    private val leaveRoomObserver = androidx.lifecycle.Observer<ChatViewModel.ViewState> { state ->
+        when (state) {
+            is ChatViewModel.LeaveRoomSuccessState -> {
+                logConversationInfos("leaveRoom#onNext")
+
+                isLeavingRoom = false
+
+                if (getRoomInfoTimerHandler != null) {
+                    getRoomInfoTimerHandler?.removeCallbacksAndMessages(null)
+                }
+
+                ApplicationWideCurrentRoomHolder.getInstance().clear()
+            }
+
+            else -> {}
+        }
+    }
 
     private val localParticipantMessageListener = SignalingMessageReceiver.LocalParticipantMessageListener { token ->
         if (CallActivity.active) {
@@ -917,6 +936,7 @@ class ChatActivity :
                             chatMode = chatMode,
                             highlightedMessageId = uiState.highlightedMessageId,
                             highlightedSearchTerm = uiState.highlightedSearchTerm,
+                            markedAsUnreadByUser = uiState.markedAsUnreadByUser,
                             hasChatPermission = participantPermissions?.hasChatPermission() == true,
                             downloadingFileState = downloadingFileState.value,
                             stickyHeaderTopOffset = overflowHeightDp
@@ -1399,11 +1419,24 @@ class ChatActivity :
         this.lifecycle.addObserver(chatViewModel)
 
         val sessionToken = SessionToken(this, ComponentName(this, VoiceMessageMediaService::class.java))
-        mediaControllerFuture = MediaController.Builder(this, sessionToken).buildAsync()
+        val future = MediaController.Builder(this, sessionToken)
+            .setListener(object : MediaController.Listener {
+                override fun onDisconnected(controller: MediaController) {
+                    mediaController?.removeListener(playerListener)
+                    stopProgressPolling()
+                    mediaController = null
+                }
+            })
+            .buildAsync()
+        mediaControllerFuture = future
 
-        mediaControllerFuture?.addListener({
+        future.addListener({
+            if (future !== mediaControllerFuture) {
+                return@addListener
+            }
+
             mediaController = try {
-                mediaControllerFuture?.get()
+                future.get()
             } catch (_: CancellationException) {
                 null
             }
@@ -1482,6 +1515,16 @@ class ChatActivity :
         lifecycleScope.launch {
             chatViewModel.isLoadingFlow.collectLatest { isLoading ->
                 updateSearchLoadingIndicator(isLoading)
+            }
+        }
+
+        lifecycleScope.launch {
+            chatViewModel.reactionFailures.collect { operation ->
+                val message = when (operation) {
+                    ChatViewModel.ReactionOperation.ADD -> R.string.reaction_add_failed
+                    ChatViewModel.ReactionOperation.DELETE -> R.string.reaction_delete_failed
+                }
+                Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
             }
         }
 
@@ -1681,6 +1724,8 @@ class ChatActivity :
                 else -> {}
             }
         }
+
+        chatViewModel.leaveRoomViewState.observeForever(leaveRoomObserver)
 
         messageInputViewModel.sendChatMessageViewState.observe(this) { state ->
             when (state) {
@@ -2035,6 +2080,9 @@ class ChatActivity :
 
         pullChatMessagesPending = false
 
+        // reset in case a previously started leave failed (success already resets this in leaveRoomObserver)
+        isLeavingRoom = false
+
         webSocketInstance?.getSignalingMessageReceiver()?.addListener(localParticipantMessageListener)
         webSocketInstance?.getSignalingMessageReceiver()?.addListener(conversationMessageListener)
 
@@ -2380,7 +2428,7 @@ class ChatActivity :
         val downloadWorker: OneTimeWorkRequest = OneTimeWorkRequest.Builder(DownloadFileToCacheWorker::class.java)
             .setInputData(data)
             .addTag(fileId)
-            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .setExpeditedIfSupported()
             .build()
 
         WorkManager.getInstance().enqueue(downloadWorker)
@@ -2538,7 +2586,7 @@ class ChatActivity :
                         .build()
                     val worker = OneTimeWorkRequest.Builder(ShareOperationWorker::class.java)
                         .setInputData(data)
-                        .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                        .setExpeditedIfSupported()
                         .build()
                     WorkManager.getInstance().enqueue(worker)
                 }
@@ -2576,15 +2624,7 @@ class ChatActivity :
         try {
             require(filesToUpload.isNotEmpty())
 
-            val newFragment = FileAttachmentPreviewFragment.newInstance(
-                filesToUpload.map { it.toString() }.toMutableList(),
-                currentConversation?.displayName ?: "",
-                CapabilitiesUtil.hasConversationSubfoldersForAttachments(spreedCapabilities)
-            )
-            newFragment.setListener { files, caption, compressImages, allowUpdate ->
-                uploadFiles(files, caption, compressImages, allowUpdate)
-            }
-            newFragment.show(supportFragmentManager, FileAttachmentPreviewFragment.TAG)
+            showFileAttachmentPreview(filesToUpload.map { it.toString() }.toMutableList())
         } catch (e: IllegalStateException) {
             context.resources?.getString(R.string.nc_upload_failed)?.let {
                 Snackbar.make(
@@ -2604,6 +2644,18 @@ class ChatActivity :
             }
             Log.e(javaClass.simpleName, "Something went wrong when trying to upload file", e)
         }
+    }
+
+    private fun showFileAttachmentPreview(files: MutableList<String>) {
+        val newFragment = FileAttachmentPreviewFragment.newInstance(
+            files,
+            currentConversation?.displayName ?: "",
+            CapabilitiesUtil.hasConversationSubfoldersForAttachments(spreedCapabilities)
+        )
+        newFragment.setListener { selectedFiles, caption, compressImages, allowUpdate ->
+            uploadFiles(selectedFiles, caption, compressImages, allowUpdate)
+        }
+        newFragment.show(supportFragmentManager, FileAttachmentPreviewFragment.TAG)
     }
 
     private fun onSelectContactResult(intent: Intent?) {
@@ -2662,15 +2714,7 @@ class ChatActivity :
             }
 
             if (permissionUtil.isFilesPermissionGranted()) {
-                val newFragment = FileAttachmentPreviewFragment.newInstance(
-                    filesToUpload,
-                    currentConversation?.displayName ?: "",
-                    CapabilitiesUtil.hasConversationSubfoldersForAttachments(spreedCapabilities)
-                )
-                newFragment.setListener { files, caption, compressImages, allowUpdate ->
-                    uploadFiles(files, caption, compressImages, allowUpdate)
-                }
-                newFragment.show(supportFragmentManager, FileAttachmentPreviewFragment.TAG)
+                showFileAttachmentPreview(filesToUpload)
             } else {
                 UploadAndShareFilesWorker.requestStoragePermission(this)
             }
@@ -2724,9 +2768,9 @@ class ChatActivity :
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == UploadAndShareFilesWorker.REQUEST_PERMISSION) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.d(TAG, "upload starting after permissions were granted")
+                Log.d(TAG, "showing upload preview after permissions were granted")
                 if (filesToUpload.isNotEmpty()) {
-                    uploadFiles(filesToUpload)
+                    showFileAttachmentPreview(filesToUpload)
                 }
             } else {
                 Snackbar
@@ -2959,11 +3003,13 @@ class ChatActivity :
         }
 
         if (::conversationUser.isInitialized && isActivityNotChangingConfigurations() && isNotInCall()) {
-            ApplicationWideCurrentRoomHolder.getInstance().clear()
-            if (validSessionId()) {
+            if (isLeavingRoom) {
+                Log.d(TAG, "not leaving room (leave already in progress)")
+            } else if (validSessionId()) {
                 leaveRoom(null)
             } else {
                 Log.d(TAG, "not leaving room (validSessionId is false)")
+                ApplicationWideCurrentRoomHolder.getInstance().clear()
             }
         } else {
             Log.d(TAG, "not leaving room...")
@@ -3005,6 +3051,8 @@ class ChatActivity :
         super.onDestroy()
         logConversationInfos("onDestroy")
 
+        chatViewModel.leaveRoomViewState.removeObserver(leaveRoomObserver)
+
         findViewById<View>(R.id.toolbar)?.setOnClickListener(null)
 
         if (actionBar != null) {
@@ -3040,6 +3088,7 @@ class ChatActivity :
 
     fun leaveRoom(functionToCallAfterLeave: (() -> Unit)?) {
         logConversationInfos("leaveRoom")
+        isLeavingRoom = true
 
         // Send the HPB "leave room" immediately, before waiting for the backend DELETE to
         // confirm. This minimises the window in which the HPB could still consider the user
@@ -3344,7 +3393,7 @@ class ChatActivity :
         val deleteConversationWorker =
             OneTimeWorkRequest.Builder(DeleteConversationWorker::class.java)
                 .setInputData(data.build())
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                .setExpeditedIfSupported()
                 .build()
         WorkManager.getInstance().enqueue(deleteConversationWorker)
 
@@ -3437,6 +3486,10 @@ class ChatActivity :
     private fun startACall(isVoiceOnlyCall: Boolean, callWithoutNotification: Boolean) {
         currentConversation?.let {
             if (::conversationUser.isInitialized) {
+                if (CapabilitiesUtil.isCallEndToEndEncryptionEnabled(spreedCapabilities)) {
+                    Snackbar.make(binding.root, R.string.nc_call_e2ee_not_supported, Snackbar.LENGTH_LONG).show()
+                    return
+                }
                 val pp = ParticipantPermissions(spreedCapabilities, it)
                 if (!pp.canStartCall() && currentConversation?.hasCall == false) {
                     Snackbar.make(binding.root, R.string.startCallForbidden, Snackbar.LENGTH_LONG).show()
@@ -3637,7 +3690,7 @@ class ChatActivity :
             token = roomToken,
             messageId = message.jsonMessageId.toString()
         )
-        chatViewModel.hidePinnedMessage(credentials!!, url)
+        chatViewModel.hidePinnedMessage(credentials!!, url, message.jsonMessageId.toLong())
     }
 
     fun pinMessage(message: ChatMessage) {
@@ -3652,8 +3705,13 @@ class ChatActivity :
             setContent {
                 GetPinnedOptionsDialog(shouldDismiss, context, viewThemeUtils) { zonedDateTime ->
                     zonedDateTime?.let {
-                        chatViewModel.pinMessage(credentials!!, url, pinUntil = zonedDateTime.toEpochSecond().toInt())
-                    } ?: chatViewModel.pinMessage(credentials!!, url)
+                        chatViewModel.pinMessage(
+                            credentials!!,
+                            url,
+                            message.jsonMessageId.toLong(),
+                            pinUntil = zonedDateTime.toEpochSecond().toInt()
+                        )
+                    } ?: chatViewModel.pinMessage(credentials!!, url, message.jsonMessageId.toLong())
 
                     shouldDismiss.value = true
                 }
@@ -3668,26 +3726,24 @@ class ChatActivity :
             token = roomToken,
             messageId = message.jsonMessageId.toString()
         )
-        chatViewModel.unPinMessage(credentials!!, url)
+        chatViewModel.unPinMessage(credentials!!, url, message.jsonMessageId.toLong())
     }
 
     private fun markAsRead(messageId: Int) {
         chatViewModel.setChatReadMessage(messageId)
     }
 
+    /**
+     * The selected message and everything newer become unread, so the read marker moves to the message
+     * right before it.
+     */
     fun markAsUnread(chatMessage: ChatMessage) {
-        val items = chatViewModel.uiState.value.items
-        val selectedIndex = items.indexOfFirst {
-            (it as? ChatViewModel.ChatItem.MessageItem)?.uiMessage?.id == chatMessage.jsonMessageId
-        }
-        val lastReadMessage = if (selectedIndex in 0 until items.size - 1) {
-            (selectedIndex + 1 until items.size)
-                .firstNotNullOfOrNull { (items[it] as? ChatViewModel.ChatItem.MessageItem)?.uiMessage?.id }
-                ?: 0
-        } else {
-            0
-        }
-        chatViewModel.setChatReadMessage(lastReadMessage)
+        val lastReadMessage = ChatViewModel.readMarkerForMarkingUnread(
+            chatViewModel.uiState.value.items,
+            chatMessage.jsonMessageId
+        ) ?: return
+
+        chatViewModel.markChatAsUnread(lastReadMessage)
     }
 
     fun copyMessage(message: ChatMessage?) {
@@ -3794,6 +3850,10 @@ class ChatActivity :
     }
 
     fun shareToNotes(message: ChatMessage) {
+        if (!hasSpreedFeatureCapability(spreedCapabilities, SpreedFeatures.NOTE_TO_SELF)) {
+            return
+        }
+
         val apiVersion = ApiUtils.getConversationApiVersion(
             conversationUser!!,
             intArrayOf(ApiUtils.API_V4, ApiUtils.API_V3, 1)
@@ -4207,15 +4267,11 @@ class ChatActivity :
     }
 
     fun cancelReply() {
-        messageInputViewModel.reply(null)
-        chatViewModel.messageDraft.quotedMessageText = null
-        chatViewModel.messageDraft.quotedDisplayName = null
-        chatViewModel.messageDraft.quotedImageUrl = null
-        chatViewModel.messageDraft.quotedJsonId = null
+        messageInputViewModel.cancelReply()
     }
 
     fun cancelCreateThread() {
-        chatViewModel.clearThreadTitle()
+        messageInputViewModel.cancelCreateThread()
     }
 
     companion object {
