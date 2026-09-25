@@ -27,7 +27,7 @@ import com.nextcloud.talk.application.NextcloudTalkApplication.Companion.sharedA
 import com.nextcloud.talk.data.user.model.User
 import com.nextcloud.talk.databinding.CallNotificationActivityBinding
 import com.nextcloud.talk.extensions.loadUserAvatar
-import com.nextcloud.talk.models.json.participants.Participant
+import com.nextcloud.talk.models.json.participants.ParticipantDto
 import com.nextcloud.talk.users.UserManager
 import com.nextcloud.talk.utils.ApiUtils
 import com.nextcloud.talk.utils.CapabilitiesUtil
@@ -38,6 +38,7 @@ import com.nextcloud.talk.utils.bundle.BundleKeys
 import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_CALL_VOICE_ONLY
 import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_ROOM_ONE_TO_ONE
 import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_ROOM_TOKEN
+import kotlinx.coroutines.runBlocking
 import okhttp3.Cache
 import java.io.IOException
 import javax.inject.Inject
@@ -77,9 +78,10 @@ class CallNotificationActivity : CallBaseActivity() {
         hideNavigationIfNoPipAvailable()
 
         handleExtras()
-        userBeingCalled = userManager.getUserWithId(internalUserId).blockingGet()
+        userBeingCalled = runBlocking { userManager.getUserWithId(internalUserId) }
 
         setupCallTypeDescription()
+        setupCallAnswerButtons()
         binding!!.conversationNameTextView.text = displayName
         setupAvatar(isOneToOneCall, conversationName)
         initClickListeners()
@@ -110,7 +112,7 @@ class CallNotificationActivity : CallBaseActivity() {
         }
     }
 
-    private fun setupCallTypeDescription() {
+    private fun hasCallFlagsCapability(): Boolean {
         val apiVersion = ApiUtils.getConversationApiVersion(
             userBeingCalled!!,
             intArrayOf(
@@ -120,23 +122,25 @@ class CallNotificationActivity : CallBaseActivity() {
             )
         )
 
-        if (apiVersion >= ApiUtils.API_V3) {
-            val hasCallFlags = hasSpreedFeatureCapability(
-                userBeingCalled?.capabilities?.spreedCapability!!,
+        return apiVersion >= ApiUtils.API_V3 &&
+            hasSpreedFeatureCapability(
+                userBeingCalled?.capabilities?.spreedCapability,
                 SpreedFeatures.CONVERSATION_CALL_FLAGS
             )
-            if (hasCallFlags) {
-                if (isInCallWithVideo(callFlag)) {
-                    binding!!.incomingCallVoiceOrVideoTextView.text = String.format(
-                        resources.getString(R.string.nc_call_video),
-                        resources.getString(R.string.nc_app_product_name)
-                    )
-                } else {
-                    binding!!.incomingCallVoiceOrVideoTextView.text = String.format(
-                        resources.getString(R.string.nc_call_voice),
-                        resources.getString(R.string.nc_app_product_name)
-                    )
-                }
+    }
+
+    private fun setupCallTypeDescription() {
+        if (hasCallFlagsCapability()) {
+            if (isInCallWithVideo(callFlag)) {
+                binding!!.incomingCallVoiceOrVideoTextView.text = String.format(
+                    resources.getString(R.string.nc_call_video),
+                    resources.getString(R.string.nc_app_product_name)
+                )
+            } else {
+                binding!!.incomingCallVoiceOrVideoTextView.text = String.format(
+                    resources.getString(R.string.nc_call_voice),
+                    resources.getString(R.string.nc_app_product_name)
+                )
             }
         } else {
             val callDescriptionWithoutTypeInfo = String.format(
@@ -144,6 +148,16 @@ class CallNotificationActivity : CallBaseActivity() {
                 resources.getString(R.string.nc_app_product_name)
             )
             binding!!.incomingCallVoiceOrVideoTextView.text = callDescriptionWithoutTypeInfo
+        }
+    }
+
+    private fun setupCallAnswerButtons() {
+        if (hasCallFlagsCapability()) {
+            if (isInCallWithVideo(callFlag)) {
+                binding!!.callAnswerVoiceOnlyView.visibility = View.GONE
+            } else {
+                binding!!.callAnswerCameraView.visibility = View.GONE
+            }
         }
     }
 
@@ -203,7 +217,7 @@ class CallNotificationActivity : CallBaseActivity() {
         startActivity(callIntent)
     }
 
-    private fun isInCallWithVideo(callFlag: Int): Boolean = (callFlag and Participant.InCallFlags.WITH_VIDEO) > 0
+    private fun isInCallWithVideo(callFlag: Int): Boolean = (callFlag and ParticipantDto.InCallFlags.WITH_VIDEO) > 0
 
     override fun onStop() {
         val notificationManager = NotificationManagerCompat.from(context)

@@ -13,7 +13,8 @@ import com.nextcloud.talk.arbitrarystorage.ArbitraryStorageManager
 import com.nextcloud.talk.conversationlist.viewmodels.ConversationsListViewModel.Companion.FOLLOWED_THREADS_EXIST
 import com.nextcloud.talk.conversationlist.viewmodels.ConversationsListViewModel.Companion.FOLLOWED_THREADS_EXIST_LAST_CHECK
 import com.nextcloud.talk.data.user.model.User
-import com.nextcloud.talk.models.json.threads.ThreadInfo
+import com.nextcloud.talk.logger.Logger
+import com.nextcloud.talk.models.json.threads.ThreadInfoDto
 import com.nextcloud.talk.models.json.threads.ThreadsOverall
 import com.nextcloud.talk.threadsoverview.data.ThreadsRepository
 import com.nextcloud.talk.utils.ApiUtils
@@ -28,7 +29,8 @@ import javax.inject.Inject
 class ThreadsOverviewViewModel @Inject constructor(
     private val threadsRepository: ThreadsRepository,
     private val currentUserProvider: CurrentUserProviderOld,
-    private val arbitraryStorageManager: ArbitraryStorageManager
+    private val arbitraryStorageManager: ArbitraryStorageManager,
+    private val logger: Logger
 ) : ViewModel() {
     private val _currentUser = currentUserProvider.currentUser.blockingGet()
     val currentUser: User = _currentUser
@@ -48,6 +50,7 @@ class ThreadsOverviewViewModel @Inject constructor(
                 _threadsListState.value = ThreadsListUiState.Success(threads.ocs?.data)
                 updateFollowedThreadsIndicator(url, threads)
             } catch (exception: Exception) {
+                logger.e(TAG, "Failed to load threads for $url", exception)
                 _threadsListState.value = ThreadsListUiState.Error(exception)
             }
         }
@@ -74,7 +77,11 @@ class ThreadsOverviewViewModel @Inject constructor(
 
     sealed class ThreadsListUiState {
         data object None : ThreadsListUiState()
-        data class Success(val threadsList: List<ThreadInfo>?) : ThreadsListUiState()
+        data class Success(val threadsList: List<ThreadInfoDto>?) : ThreadsListUiState()
         data class Error(val exception: Exception) : ThreadsListUiState()
+    }
+
+    companion object {
+        private val TAG = ThreadsOverviewViewModel::class.java.simpleName
     }
 }

@@ -7,12 +7,13 @@
 package com.nextcloud.talk.signaling
 
 import com.bluelinelabs.logansquare.LoganSquare
-import com.nextcloud.talk.models.json.chat.ChatMessageJson
+import com.nextcloud.talk.application.NextcloudTalkApplication
+import com.nextcloud.talk.models.json.chat.ChatMessageDto
 import com.nextcloud.talk.models.json.converters.EnumActorTypeConverter
 import com.nextcloud.talk.models.json.converters.EnumParticipantTypeConverter
-import com.nextcloud.talk.models.json.participants.Participant
-import com.nextcloud.talk.models.json.signaling.NCSignalingMessage
-import com.nextcloud.talk.models.json.websocket.CallWebSocketMessage
+import com.nextcloud.talk.models.json.participants.ParticipantDto
+import com.nextcloud.talk.models.json.signaling.NCSignalingMessageDto
+import com.nextcloud.talk.models.json.websocket.CallWebSocketMessageDto
 import org.json.JSONObject
 import kotlin.Any
 import kotlin.Int
@@ -20,6 +21,8 @@ import kotlin.Long
 import kotlin.RuntimeException
 import kotlin.String
 import kotlin.toString
+
+private val TAG = SignalingMessageReceiver::class.java.simpleName
 
 /**
  * Hub to register listeners for signaling messages of different kinds.
@@ -82,7 +85,7 @@ abstract class SignalingMessageReceiver {
          *
          * @param participants all the participants (users and guests) in the room
          */
-        fun onUsersInRoom(participants: MutableList<Participant?>)
+        fun onUsersInRoom(participants: MutableList<ParticipantDto?>)
 
         /**
          * List of all the participants in the call or the room (depending on what triggered the event).
@@ -111,7 +114,7 @@ abstract class SignalingMessageReceiver {
          *
          * @param participants all the participants (users and guests) in the room
          */
-        fun onParticipantsUpdate(participants: MutableList<Participant?>)
+        fun onParticipantsUpdate(participants: MutableList<ParticipantDto?>)
 
         /**
          * Update of the properties of all the participants in the room.
@@ -166,7 +169,7 @@ abstract class SignalingMessageReceiver {
     interface ConversationMessageListener {
         fun onStartTyping(userId: String?, session: String?)
         fun onStopTyping(userId: String?, session: String?)
-        fun onChatMessagesReceived(chatMessages: List<ChatMessageJson>)
+        fun onChatMessagesReceived(chatMessages: List<ChatMessageDto>)
     }
 
     /**
@@ -322,6 +325,11 @@ abstract class SignalingMessageReceiver {
         try {
             switchToMap = eventMap?.get("switchto") as Map<String, Any>?
         } catch (e: RuntimeException) {
+            NextcloudTalkApplication.sharedApplication?.logger?.e(
+                TAG,
+                "Failed to parse switchto event: invalid 'switchto' field",
+                e
+            )
             // Broken message, this should not happen.
             return
         }
@@ -335,6 +343,11 @@ abstract class SignalingMessageReceiver {
         try {
             token = switchToMap["roomid"].toString()
         } catch (e: RuntimeException) {
+            NextcloudTalkApplication.sharedApplication?.logger?.e(
+                TAG,
+                "Failed to parse switchto event: invalid 'roomid' field",
+                e
+            )
             // Broken message, this should not happen.
             return
         }
@@ -343,7 +356,7 @@ abstract class SignalingMessageReceiver {
     }
 
     protected fun processChatMessageWebSocketMessage(jsonString: String) {
-        fun parseChatMessages(jsonString: String): List<ChatMessageJson> {
+        fun parseChatMessages(jsonString: String): List<ChatMessageDto> {
             return try {
                 val root = JSONObject(jsonString)
                 val eventObj = root.optJSONObject("event") ?: return emptyList()
@@ -353,21 +366,31 @@ abstract class SignalingMessageReceiver {
 
                 val commentsArray = chatObj.optJSONArray("comments")
                 if (commentsArray != null) {
-                    val messages = mutableListOf<ChatMessageJson>()
+                    val messages = mutableListOf<ChatMessageDto>()
                     for (i in 0 until commentsArray.length()) {
                         val commentObj = commentsArray.optJSONObject(i) ?: continue
                         try {
-                            messages.add(LoganSquare.parse(commentObj.toString(), ChatMessageJson::class.java))
+                            messages.add(LoganSquare.parse(commentObj.toString(), ChatMessageDto::class.java))
                         } catch (e: Exception) {
+                            NextcloudTalkApplication.sharedApplication?.logger?.w(
+                                TAG,
+                                "Failed to parse chat message comment entry, skipping it",
+                                e
+                            )
                             // Skip unparseable entries
                         }
                     }
                     messages
                 } else {
                     val commentObj = chatObj.optJSONObject("comment") ?: return emptyList()
-                    listOf(LoganSquare.parse(commentObj.toString(), ChatMessageJson::class.java))
+                    listOf(LoganSquare.parse(commentObj.toString(), ChatMessageDto::class.java))
                 }
             } catch (e: Exception) {
+                NextcloudTalkApplication.sharedApplication?.logger?.w(
+                    TAG,
+                    "Failed to parse chat message websocket message, skipping it",
+                    e
+                )
                 emptyList()
             }
         }
@@ -383,6 +406,11 @@ abstract class SignalingMessageReceiver {
         try {
             updateMap = eventMap?.get("update") as Map<String, Any>?
         } catch (e: RuntimeException) {
+            NextcloudTalkApplication.sharedApplication?.logger?.e(
+                TAG,
+                "Failed to parse participants update event: invalid 'update' field",
+                e
+            )
             // Broken message, this should not happen.
             return
         }
@@ -427,6 +455,11 @@ abstract class SignalingMessageReceiver {
         try {
             inCall = updateMap["incall"].toString().toLong()
         } catch (e: RuntimeException) {
+            NextcloudTalkApplication.sharedApplication?.logger?.e(
+                TAG,
+                "Failed to parse all-participants update: invalid 'incall' field",
+                e
+            )
             // Broken message, this should not happen.
             return
         }
@@ -469,6 +502,11 @@ abstract class SignalingMessageReceiver {
         try {
             users = updateMap["users"] as List<Map<String, Any>>?
         } catch (e: RuntimeException) {
+            NextcloudTalkApplication.sharedApplication?.logger?.e(
+                TAG,
+                "Failed to parse participants update: invalid 'users' field",
+                e
+            )
             // Broken message, this should not happen.
             return
         }
@@ -478,12 +516,17 @@ abstract class SignalingMessageReceiver {
             return
         }
 
-        val participants: MutableList<Participant?> = ArrayList(users.size)
+        val participants: MutableList<ParticipantDto?> = ArrayList(users.size)
 
         for (user in users) {
             try {
                 participants.add(getParticipantFromMessageMap(user))
             } catch (e: RuntimeException) {
+                NextcloudTalkApplication.sharedApplication?.logger?.e(
+                    TAG,
+                    "Failed to parse participant entry in participants update",
+                    e
+                )
                 // Broken message, this should not happen.
                 return
             }
@@ -511,13 +554,18 @@ abstract class SignalingMessageReceiver {
         //     ],
         // }
 
-        val participants: MutableList<Participant?> = ArrayList(users.size)
+        val participants: MutableList<ParticipantDto?> = ArrayList(users.size)
 
         for (user in users) {
             val nullSafeUserMap = user as? Map<String, Any> ?: return
             try {
                 participants.add(getParticipantFromMessageMap(nullSafeUserMap))
             } catch (e: RuntimeException) {
+                NextcloudTalkApplication.sharedApplication?.logger?.e(
+                    TAG,
+                    "Failed to parse participant entry in usersInRoom message",
+                    e
+                )
                 // Broken message, this should not happen.
                 return
             }
@@ -527,7 +575,7 @@ abstract class SignalingMessageReceiver {
     }
 
     /**
-     * Creates and initializes a Participant from the data in the given map.
+     * Creates and initializes a ParticipantDto from the data in the given map.
      *
      *
      * Maps from internal and external signaling server messages can be used. Nevertheless, besides the differences
@@ -536,10 +584,10 @@ abstract class SignalingMessageReceiver {
      * "sessionId") may cause a RuntimeException to be thrown.
      *
      * @param participantMap the map with the participant data
-     * @return the Participant
+     * @return the ParticipantDto
      */
-    private fun getParticipantFromMessageMap(participantMap: Map<String, Any>): Participant {
-        val participant = Participant()
+    private fun getParticipantFromMessageMap(participantMap: Map<String, Any>): ParticipantDto {
+        val participant = ParticipantDto()
 
         participant.inCall = participantMap["inCall"].toString().toLong()
         participant.lastPing = participantMap["lastPing"].toString().toLong()
@@ -572,7 +620,7 @@ abstract class SignalingMessageReceiver {
         return participant
     }
 
-    protected fun processCallWebSocketMessage(callWebSocketMessage: CallWebSocketMessage) {
+    protected fun processCallWebSocketMessage(callWebSocketMessage: CallWebSocketMessageDto) {
         val signalingMessage = callWebSocketMessage.ncSignalingMessage
 
         if (callWebSocketMessage.senderWebSocketMessage != null && signalingMessage != null) {
@@ -592,7 +640,7 @@ abstract class SignalingMessageReceiver {
     }
 
     @Suppress("ReturnCount", "LongMethod")
-    fun processSignalingMessage(signalingMessage: NCSignalingMessage?) {
+    fun processSignalingMessage(signalingMessage: NCSignalingMessageDto?) {
         if (signalingMessage == null) {
             return
         }

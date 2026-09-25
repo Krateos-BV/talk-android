@@ -10,7 +10,6 @@ package com.nextcloud.talk.threadsoverview
 import android.content.Intent
 import android.os.Bundle
 import android.text.format.DateUtils
-import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -44,11 +43,10 @@ import com.nextcloud.talk.activities.BaseActivity
 import com.nextcloud.talk.api.NcApi
 import com.nextcloud.talk.application.NextcloudTalkApplication
 import com.nextcloud.talk.chat.ChatActivity
-import com.nextcloud.talk.chat.ChatActivity.Companion.TAG
 import com.nextcloud.talk.components.ColoredStatusBar
 import com.nextcloud.talk.components.StandardAppBar
 import com.nextcloud.talk.data.database.mappers.toDomainModel
-import com.nextcloud.talk.models.json.threads.ThreadInfo
+import com.nextcloud.talk.models.json.threads.ThreadInfoDto
 import com.nextcloud.talk.threadsoverview.components.ThreadRow
 import com.nextcloud.talk.threadsoverview.viewmodels.ThreadsOverviewViewModel
 import com.nextcloud.talk.users.UserManager
@@ -165,14 +163,18 @@ fun ThreadsOverviewScreen(
         }
 
         is ThreadsOverviewViewModel.ThreadsListUiState.Error -> {
-            Log.e(TAG, "Error when retrieving threads", uiState.exception)
+            NextcloudTalkApplication.sharedApplication?.logger?.e(
+                ThreadsOverviewActivity.TAG,
+                "Error when retrieving threads",
+                uiState.exception
+            )
             ErrorView(message = stringResource(R.string.nc_common_error_sorry))
         }
     }
 }
 
 @Composable
-fun ThreadsList(threads: List<ThreadInfo>, onThreadClick: (roomToken: String, threadId: Int) -> Unit) {
+fun ThreadsList(threads: List<ThreadInfoDto>, onThreadClick: (roomToken: String, threadId: Int) -> Unit) {
     val space = ' '
     if (threads.isEmpty()) {
         Box(
@@ -220,7 +222,7 @@ fun ThreadsList(threads: List<ThreadInfo>, onThreadClick: (roomToken: String, th
 }
 
 @Suppress("MagicNumber")
-private fun getLastActivityDate(threadInfo: ThreadInfo): String {
+private fun getLastActivityDate(threadInfo: ThreadInfoDto): String {
     val oneSecond = 1000L
 
     val lastActivityTimestamp = threadInfo.thread?.lastActivity ?: 0

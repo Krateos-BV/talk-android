@@ -17,26 +17,29 @@ import com.nextcloud.talk.data.database.mappers.asEntity
 import com.nextcloud.talk.data.database.model.ChatBlockEntity
 import com.nextcloud.talk.data.database.model.ChatMessageEntity
 import com.nextcloud.talk.data.database.model.ConversationEntity
+import com.nextcloud.talk.data.database.model.SendStatus
 import com.nextcloud.talk.data.network.NetworkMonitor
 import com.nextcloud.talk.data.user.model.User
 import com.nextcloud.talk.logger.Logger
 import com.nextcloud.talk.models.domain.ConversationModel
-import com.nextcloud.talk.models.json.capabilities.Capabilities
-import com.nextcloud.talk.models.json.capabilities.SpreedCapability
-import com.nextcloud.talk.models.json.chat.ChatMessageJson
+import com.nextcloud.talk.models.json.capabilities.CapabilitiesDto
+import com.nextcloud.talk.models.json.capabilities.SpreedCapabilityDto
+import com.nextcloud.talk.models.json.chat.ChatMessageDto
 import com.nextcloud.talk.models.json.chat.ChatOCS
 import com.nextcloud.talk.models.json.chat.ChatOCSSingleMessage
 import com.nextcloud.talk.models.json.chat.ChatOverall
 import com.nextcloud.talk.models.json.chat.ChatOverallSingleMessage
-import com.nextcloud.talk.models.json.generic.GenericMeta
+import com.nextcloud.talk.models.json.generic.GenericMetaDto
 import com.nextcloud.talk.models.json.generic.GenericOverall
-import com.nextcloud.talk.models.json.conversations.Conversation
+import com.nextcloud.talk.models.json.conversations.ConversationDto
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -52,6 +55,7 @@ import org.mockito.kotlin.eq
 import org.mockito.kotlin.doSuspendableAnswer
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyBlocking
 import org.mockito.kotlin.whenever
 import org.mockito.kotlin.wheneverBlocking
@@ -207,6 +211,96 @@ class OfflineFirstChatRepositoryTest {
             assertFalse(result)
             verifyBlocking(network, never()) { pullChatMessages(any(), any(), any()) }
         }
+
+    @Test
+    fun `addTemporaryMessage upserts a pending local echo and emits it on success`() =
+        runTest {
+            repository.updateConversation(conversation(lastReadMessage = 0, unreadMessages = 0))
+
+            val result = repository.addTemporaryMessage(
+                message = "hello",
+                displayName = "Me",
+                replyTo = 0,
+                sendWithoutNotification = false,
+                referenceId = "ref-1"
+            ).toList().single()
+
+            assertTrue(result.isSuccess)
+            assertEquals("hello", result.getOrNull()?.message)
+            assertEquals(SendStatus.PENDING, result.getOrNull()?.sendStatus)
+            assertEquals(true, result.getOrNull()?.isTemporary)
+
+            val entityCaptor = argumentCaptor<ChatMessageEntity>()
+            verifyBlocking(chatDao) { upsertChatMessage(entityCaptor.capture()) }
+            assertEquals(INTERNAL_CONVERSATION_ID, entityCaptor.firstValue.internalConversationId)
+            assertEquals("ref-1", entityCaptor.firstValue.referenceId)
+        }
+
+    @Test
+    fun `addTemporaryMessage tolerates a collector that stops after the first value`() =
+        runTest {
+            // first()/take(1) cancel the flow right after receiving one value, which used to
+            // surface as "Flow exception transparency is violated" because that cancellation was
+            // caught by addTemporaryMessage's own catch(Exception) block and turned into a second,
+            // illegal emit() call.
+            repository.updateConversation(conversation(lastReadMessage = 0, unreadMessages = 0))
+
+            val result = repository.addTemporaryMessage(
+                message = "hello",
+                displayName = "Me",
+                replyTo = 0,
+                sendWithoutNotification = false,
+                referenceId = "ref-1b"
+            ).first()
+
+            assertTrue(result.isSuccess)
+        }
+
+    @Test
+    fun `markMessageForResend resets a failed temp message back to PENDING without sending anything`() =
+        runTest {
+            val failedMessage = tempMessageEntity(referenceId = "ref-2", sendStatus = SendStatus.FAILED)
+            whenever(chatDao.getTempMessageForConversation(INTERNAL_CONVERSATION_ID, "ref-2", null))
+                .thenReturn(flowOf(failedMessage))
+
+            val result = repository.markMessageForResend("ref-2").toList().single()
+
+            assertTrue(result.isSuccess)
+            assertEquals(SendStatus.PENDING, result.getOrNull()?.sendStatus)
+            assertEquals(SendStatus.PENDING, failedMessage.sendStatus)
+            verify(chatDao).updateChatMessage(failedMessage)
+            // resending is only a local status reset - the actual send is left to SendMessageWorker
+            verifyBlocking(network, never()) { sendChatMessage(any(), any(), any(), any(), any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `markMessageForResend fails when no temp message exists for the reference id`() =
+        runTest {
+            whenever(chatDao.getTempMessageForConversation(INTERNAL_CONVERSATION_ID, "missing", null))
+                .thenReturn(flowOf(null))
+
+            val result = repository.markMessageForResend("missing").toList().single()
+
+            assertTrue(result.isFailure)
+            verify(chatDao, never()).updateChatMessage(any())
+        }
+
+    private fun tempMessageEntity(referenceId: String, sendStatus: SendStatus): ChatMessageEntity =
+        ChatMessageEntity(
+            internalId = "$INTERNAL_CONVERSATION_ID@_temp_$referenceId",
+            accountId = ACCOUNT_ID,
+            token = ROOM_TOKEN,
+            internalConversationId = INTERNAL_CONVERSATION_ID,
+            actorDisplayName = "Me",
+            message = "hello",
+            actorId = "me",
+            actorType = "users",
+            messageType = "comment",
+            systemMessageType = ChatMessage.SystemMessageType.DUMMY,
+            referenceId = referenceId,
+            isTemporary = true,
+            sendStatus = sendStatus
+        )
 
     private fun givenLatestBlock(block: ChatBlockEntity?) {
         whenever(chatBlocksDao.getLatestChatBlock(INTERNAL_CONVERSATION_ID, null))
@@ -366,7 +460,7 @@ class OfflineFirstChatRepositoryTest {
             wheneverBlocking { network.editChatMessage(any(), any(), any()) } doSuspendableAnswer {
                 ChatOverallSingleMessage(
                     ocs = ChatOCSSingleMessage(
-                        meta = GenericMeta(status = "ok", statusCode = HTTP_OK, message = null),
+                        meta = GenericMetaDto(status = "ok", statusCode = HTTP_OK, message = null),
                         data = message(SYSTEM_MESSAGE_ID).apply {
                             message = "You edited a message"
                             messageType = "system"
@@ -448,15 +542,16 @@ class OfflineFirstChatRepositoryTest {
             id = ACCOUNT_ID,
             userId = "me",
             username = "me",
+            displayName = "Me",
             baseUrl = "https://server.example.com",
-            capabilities = Capabilities().apply {
-                spreedCapability = SpreedCapability().apply { features = listOf("chat-keep-notifications") }
+            capabilities = CapabilitiesDto().apply {
+                spreedCapability = SpreedCapabilityDto().apply { features = listOf("chat-keep-notifications") }
             }
         )
 
     private fun conversation(lastReadMessage: Int, unreadMessages: Int): ConversationModel =
         ConversationModel.mapToConversationModel(
-            Conversation(
+            ConversationDto(
                 token = ROOM_TOKEN,
                 lastReadMessage = lastReadMessage,
                 unreadMessages = unreadMessages
@@ -475,8 +570,8 @@ class OfflineFirstChatRepositoryTest {
             hasHistory = hasHistory
         )
 
-    private fun message(id: Long): ChatMessageJson =
-        ChatMessageJson(
+    private fun message(id: Long): ChatMessageDto =
+        ChatMessageDto(
             id = id,
             token = ROOM_TOKEN,
             actorType = "users",
@@ -614,7 +709,7 @@ class OfflineFirstChatRepositoryTest {
     private lateinit var storedConversation: ConversationEntity
 
     private fun givenCachedConversation(pinnedId: Long? = null) {
-        storedConversation = Conversation(token = ROOM_TOKEN)
+        storedConversation = ConversationDto(token = ROOM_TOKEN)
             .asEntity(ACCOUNT_ID)
             .copy(lastPinnedId = pinnedId)
         whenever(conversationsDao.getConversationForUser(eq(ACCOUNT_ID), eq(ROOM_TOKEN)))
@@ -657,7 +752,7 @@ class OfflineFirstChatRepositoryTest {
     ): ChatOverallSingleMessage =
         ChatOverallSingleMessage(
             ocs = ChatOCSSingleMessage(
-                meta = GenericMeta(status = "ok", statusCode = statusCode, message = null),
+                meta = GenericMetaDto(status = "ok", statusCode = statusCode, message = null),
                 // the endpoint answers with the system message about the edit, the edited message
                 // itself is its parent
                 data = message(SYSTEM_MESSAGE_ID).apply {
@@ -678,7 +773,7 @@ class OfflineFirstChatRepositoryTest {
     private fun httpException(code: Int) =
         HttpException(Response.error<Any>(code, "".toResponseBody("text/plain".toMediaType())))
 
-    private fun overall(vararg messages: ChatMessageJson): ChatOverall =
+    private fun overall(vararg messages: ChatMessageDto): ChatOverall =
         ChatOverall(ocs = ChatOCS(meta = null, data = messages.toList()))
 
     companion object {

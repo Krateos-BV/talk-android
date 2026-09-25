@@ -13,7 +13,7 @@ import com.nextcloud.talk.chat.data.model.ChatMessage
 import com.nextcloud.talk.data.database.model.ChatMessageEntity
 import com.nextcloud.talk.data.user.model.User
 import com.nextcloud.talk.models.domain.ConversationModel
-import com.nextcloud.talk.models.json.chat.ChatMessageJson
+import com.nextcloud.talk.models.json.chat.ChatMessageDto
 import com.nextcloud.talk.models.json.chat.ChatOverallSingleMessage
 import com.nextcloud.talk.models.json.generic.GenericOverall
 import kotlinx.coroutines.flow.Flow
@@ -138,16 +138,11 @@ interface ChatMessageRepository : LifecycleAwareManager {
         threadTitle: String?
     ): Flow<Result<ChatMessage?>>
 
-    @Suppress("LongParameterList")
-    suspend fun resendChatMessage(
-        credentials: String,
-        url: String,
-        message: String,
-        displayName: String,
-        replyTo: Int,
-        sendWithoutNotification: Boolean,
-        referenceId: String
-    ): Flow<Result<ChatMessage?>>
+    /**
+     * Resets a previously failed temporary message back to PENDING so it can be handed to
+     * SendMessageWorker for another send attempt. Does not itself send anything.
+     */
+    suspend fun markMessageForResend(referenceId: String): Flow<Result<ChatMessage?>>
 
     suspend fun addTemporaryMessage(
         message: CharSequence,
@@ -251,7 +246,7 @@ interface ChatMessageRepository : LifecycleAwareManager {
 
     suspend fun getScheduledChatMessages(credentials: String, url: String): Flow<Result<List<ChatMessage>>>
 
-    suspend fun onSignalingChatMessageReceived(chatMessages: List<ChatMessageJson>)
+    suspend fun onSignalingChatMessageReceived(chatMessages: List<ChatMessageDto>)
 
     fun observeLatestMessages(internalConversationId: String): Flow<List<ChatMessageEntity>>
 

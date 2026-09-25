@@ -25,16 +25,17 @@ import com.nextcloud.talk.data.user.model.User
 import com.nextcloud.talk.extensions.toIntOrZero
 import com.nextcloud.talk.logger.Logger
 import com.nextcloud.talk.models.domain.ConversationModel
-import com.nextcloud.talk.models.json.chat.ChatMessageJson
+import com.nextcloud.talk.models.json.chat.ChatMessageDto
 import com.nextcloud.talk.models.json.chat.ChatOverallSingleMessage
 import com.nextcloud.talk.models.json.converters.EnumActorTypeConverter
 import com.nextcloud.talk.models.json.generic.GenericOverall
-import com.nextcloud.talk.models.json.participants.Participant
+import com.nextcloud.talk.models.json.participants.ParticipantDto
 import com.nextcloud.talk.utils.bundle.BundleKeys
 import com.nextcloud.talk.utils.message.SendMessageUtils
 import com.nextcloud.talk.utils.revertOnCancellation
 import com.nextcloud.talk.utils.withRetry
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -415,10 +416,9 @@ class OfflineFirstChatRepository @Inject constructor(
             lastKnown = anchorMessageId.toInt(),
             limit = withMessageLimit
         )
-        withNetworkParams.putSerializable(BundleKeys.KEY_FIELD_MAP, fieldMap)
 
         Log.d(TAG, "Starting online request for loadMoreMessages")
-        getAndPersistMessages(withNetworkParams)
+        syncer.pullUntilVisibleMessage(syncTarget, fieldMap, syncEvents)
 
         return syncer.getBlockOfMessage(syncTarget, anchorMessageId.toInt())?.let {
             ChatMessageRepository.MessagesRange(
@@ -573,7 +573,7 @@ class OfflineFirstChatRepository @Inject constructor(
         return outcome.persistedNewMessages
     }
 
-    private fun isUntranslatedSystemMessage(messagesJson: List<ChatMessageJson>): Boolean =
+    private fun isUntranslatedSystemMessage(messagesJson: List<ChatMessageDto>): Boolean =
         syncer.isUntranslatedSystemMessage(messagesJson)
 
     override fun handleOnPause() {
@@ -661,16 +661,7 @@ class OfflineFirstChatRepository @Inject constructor(
             }
     }
 
-    @Suppress("LongParameterList")
-    override suspend fun resendChatMessage(
-        credentials: String,
-        url: String,
-        message: String,
-        displayName: String,
-        replyTo: Int,
-        sendWithoutNotification: Boolean,
-        referenceId: String
-    ): Flow<Result<ChatMessage?>> {
+    override suspend fun markMessageForResend(referenceId: String): Flow<Result<ChatMessage?>> {
         val messageToResend = chatDao.getTempMessageForConversation(
             internalConversationId,
             referenceId,
@@ -683,16 +674,9 @@ class OfflineFirstChatRepository @Inject constructor(
             val messageToResendModel = messageToResend.toDomainModel()
             _updateMessageFlow.emit(messageToResendModel)
 
-            sendChatMessage(
-                credentials = credentials,
-                url = url,
-                message = message,
-                displayName = displayName,
-                replyTo = replyTo,
-                sendWithoutNotification = sendWithoutNotification,
-                referenceId = referenceId,
-                threadTitle = null
-            )
+            flow {
+                emit(Result.success(messageToResendModel))
+            }
         } else {
             flow {
                 emit(Result.failure(IllegalStateException("No temporary message found to resend")))
@@ -718,6 +702,12 @@ class OfflineFirstChatRepository @Inject constructor(
                     referenceId
                 )
                 chatDao.upsertChatMessage(tempChatMessageEntity)
+                emit(Result.success(tempChatMessageEntity.toDomainModel()))
+            } catch (e: CancellationException) {
+                // a collector (e.g. first()/take(1)) is done with the flow, not a real failure -
+                // rethrow instead of turning it into a Result.failure emission, which would violate
+                // flow exception transparency since the collector already stopped listening
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Something went wrong when adding temporary message", e)
                 emit(Result.failure(e))
@@ -771,7 +761,7 @@ class OfflineFirstChatRepository @Inject constructor(
                     deleted = false,
                     token = conversationModel.token,
                     actorId = currentUser.userId!!,
-                    actorType = EnumActorTypeConverter().convertToString(Participant.ActorType.USERS),
+                    actorType = EnumActorTypeConverter().convertToString(ParticipantDto.ActorType.USERS),
                     accountId = currentUser.id!!,
                     messageParameters = messageParameters,
                     messageType = "comment",
@@ -819,9 +809,11 @@ class OfflineFirstChatRepository @Inject constructor(
             }
             Result.success(response)
         } catch (e: HttpException) {
+            logger.e(TAG, "Failed to edit chat message $messageId", e)
             restore?.invoke()
             Result.failure(e)
         } catch (e: IOException) {
+            logger.e(TAG, "Failed to edit chat message $messageId", e)
             restore?.invoke()
             Result.failure(e)
         }
@@ -845,7 +837,7 @@ class OfflineFirstChatRepository @Inject constructor(
         message.message = text
         message.lastEditTimestamp = System.currentTimeMillis() / MILLIES
         message.lastEditActorId = currentUser.userId
-        message.lastEditActorType = Participant.ActorType.USERS.name.lowercase()
+        message.lastEditActorType = ParticipantDto.ActorType.USERS.name.lowercase()
         message.lastEditActorDisplayName = currentUser.displayName
         withContext(Dispatchers.IO) { chatDao.updateChatMessage(message) }
 
@@ -897,12 +889,15 @@ class OfflineFirstChatRepository @Inject constructor(
         } catch (e: HttpException) {
             if (e.code() == HTTP_NOT_FOUND) {
                 // the server does not know the message any more, so it is gone either way
+                logger.w(TAG, "Message $messageId was already gone on the server when deleting it", e)
                 Result.success(null)
             } else {
+                logger.e(TAG, "Failed to delete chat message $messageId", e)
                 restore?.invoke()
                 Result.failure(e)
             }
         } catch (e: IOException) {
+            logger.e(TAG, "Failed to delete chat message $messageId", e)
             restore?.invoke()
             Result.failure(e)
         }
@@ -957,6 +952,7 @@ class OfflineFirstChatRepository @Inject constructor(
                 _updateMessageFlow.emit(editedMessageModel)
                 emit(true)
             } catch (e: Exception) {
+                logger.e(TAG, "Failed to edit temp chat message ${message.jsonMessageId}", e)
                 emit(false)
             }
         }
@@ -1074,7 +1070,7 @@ class OfflineFirstChatRepository @Inject constructor(
         }
     }
 
-    override suspend fun onSignalingChatMessageReceived(chatMessages: List<ChatMessageJson>) {
+    override suspend fun onSignalingChatMessageReceived(chatMessages: List<ChatMessageDto>) {
         // check if we need to get user specific data from the backend
         if (!isUntranslatedSystemMessage(chatMessages) ||
             chatMessages.any { it.messageParameters?.containsKey("file") == true }
@@ -1097,7 +1093,7 @@ class OfflineFirstChatRepository @Inject constructor(
     }
 
     suspend fun persistChatMessagesAndHandleSystemMessages(
-        chatMessages: List<ChatMessageJson>,
+        chatMessages: List<ChatMessageDto>,
         emitOnIncoming: Boolean = false
     ): List<ChatMessageEntity> =
         syncer.persistChatMessagesAndHandleSystemMessages(syncTarget, chatMessages, emitOnIncoming, syncEvents)
@@ -1256,7 +1252,7 @@ class OfflineFirstChatRepository @Inject constructor(
             deleted = false,
             token = conversationModel.token,
             actorId = currentUser.userId!!,
-            actorType = EnumActorTypeConverter().convertToString(Participant.ActorType.USERS),
+            actorType = EnumActorTypeConverter().convertToString(ParticipantDto.ActorType.USERS),
             accountId = currentUser.id!!,
             messageParameters = null,
             messageType = "comment",
