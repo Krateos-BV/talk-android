@@ -10,8 +10,9 @@ package com.nextcloud.talk.contacts
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nextcloud.talk.data.user.model.User
-import com.nextcloud.talk.models.json.autocomplete.AutocompleteUser
-import com.nextcloud.talk.models.json.conversations.Conversation
+import com.nextcloud.talk.logger.Logger
+import com.nextcloud.talk.models.json.autocomplete.AutocompleteUserDto
+import com.nextcloud.talk.models.json.conversations.ConversationDto
 import com.nextcloud.talk.utils.database.user.CurrentUserProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +27,8 @@ import javax.inject.Inject
 
 class ContactsViewModel @Inject constructor(
     private val repository: ContactsRepository,
-    private val currentUserProvider: CurrentUserProvider
+    private val currentUserProvider: CurrentUserProvider,
+    private val logger: Logger
 ) : ViewModel() {
 
     private val _contactsViewState = MutableStateFlow<ContactsUiState>(ContactsUiState.None)
@@ -39,8 +41,8 @@ class ContactsViewModel @Inject constructor(
     val shareTypeList: List<String> = shareTypes
     private val _isSearchActive = MutableStateFlow(false)
     val isSearchActive: StateFlow<Boolean> = _isSearchActive
-    private val selectedParticipants = MutableStateFlow<List<AutocompleteUser>>(emptyList())
-    val selectedParticipantsList: StateFlow<List<AutocompleteUser>> = selectedParticipants.asStateFlow()
+    private val selectedParticipants = MutableStateFlow<List<AutocompleteUserDto>>(emptyList())
+    val selectedParticipantsList: StateFlow<List<AutocompleteUserDto>> = selectedParticipants.asStateFlow()
     private val _isAddParticipantsView = MutableStateFlow(false)
     val isAddParticipantsView: StateFlow<Boolean> = _isAddParticipantsView
 
@@ -48,7 +50,7 @@ class ContactsViewModel @Inject constructor(
     val enableAddButton: StateFlow<Boolean> = _enableAddButton
 
     @Suppress("PropertyName")
-    private val _selectedContacts = MutableStateFlow<List<AutocompleteUser>>(emptyList())
+    private val _selectedContacts = MutableStateFlow<List<AutocompleteUserDto>>(emptyList())
 
     @Suppress("PropertyName")
     private val _clickAddButton = MutableStateFlow(false)
@@ -62,6 +64,10 @@ class ContactsViewModel @Inject constructor(
     private val currentUser: User?
         get() = currentUserFlow.value
 
+    companion object {
+        private val TAG = ContactsViewModel::class.java.simpleName
+    }
+
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
     }
@@ -70,7 +76,7 @@ class ContactsViewModel @Inject constructor(
         _clickAddButton.value = value
     }
 
-    fun selectContact(contact: AutocompleteUser) {
+    fun selectContact(contact: AutocompleteUserDto) {
         val updatedParticipants = selectedParticipants.value + contact
         selectedParticipants.value = updatedParticipants
         _selectedContacts.value = _selectedContacts.value + contact
@@ -80,13 +86,13 @@ class ContactsViewModel @Inject constructor(
         _enableAddButton.value = _selectedContacts.value.isNotEmpty()
     }
 
-    fun deselectContact(contact: AutocompleteUser) {
+    fun deselectContact(contact: AutocompleteUserDto) {
         val updatedParticipants = selectedParticipants.value - contact
         selectedParticipants.value = updatedParticipants
         _selectedContacts.value = _selectedContacts.value - contact
     }
 
-    fun updateSelectedParticipants(participants: List<AutocompleteUser>) {
+    fun updateSelectedParticipants(participants: List<AutocompleteUserDto>) {
         selectedParticipants.value = participants
     }
     fun setSearchActive(searchState: Boolean) {
@@ -120,7 +126,7 @@ class ContactsViewModel @Inject constructor(
                     if (query != "") query else searchQuery.value,
                     shareTypeList
                 )
-                val contactsList: MutableList<AutocompleteUser>? = contacts.ocs!!.data?.toMutableList()
+                val contactsList: MutableList<AutocompleteUserDto>? = contacts.ocs!!.data?.toMutableList()
 
                 if (hideAlreadyAddedParticipants && !_clickAddButton.value) {
                     contactsList?.removeAll(selectedParticipants.value)
@@ -131,6 +137,7 @@ class ContactsViewModel @Inject constructor(
                 }
                 _contactsViewState.value = ContactsUiState.Success(contactsList)
             } catch (exception: Exception) {
+                logger.e(TAG, "Failed to fetch contacts for search", exception)
                 _contactsViewState.value = ContactsUiState.Error(exception.message ?: "")
                 if (exception is CancellationException) {
                     throw exception
@@ -154,7 +161,7 @@ class ContactsViewModel @Inject constructor(
                     if (query != "") query else searchQuery.value,
                     shareTypeList
                 )
-                val contactsList: MutableList<AutocompleteUser>? = contacts.ocs!!.data?.toMutableList()
+                val contactsList: MutableList<AutocompleteUserDto>? = contacts.ocs!!.data?.toMutableList()
 
                 if (hideAlreadyAddedParticipants && !_clickAddButton.value) {
                     contactsList?.removeAll(selectedParticipants.value)
@@ -165,6 +172,7 @@ class ContactsViewModel @Inject constructor(
                 }
                 _contactsViewState.value = ContactsUiState.Success(contactsList)
             } catch (exception: Exception) {
+                logger.e(TAG, "Failed to fetch contacts for search", exception)
                 _contactsViewState.value = ContactsUiState.Error(exception.message ?: "")
                 if (exception is CancellationException) {
                     throw exception
@@ -189,9 +197,10 @@ class ContactsViewModel @Inject constructor(
                     conversationName
                 )
 
-                val conversation: Conversation? = room.ocs?.data
+                val conversation: ConversationDto? = room.ocs?.data
                 _roomViewState.value = RoomUiState.Success(conversation)
             } catch (exception: Exception) {
+                logger.e(TAG, "Failed to create room", exception)
                 _roomViewState.value = RoomUiState.Error(exception.message ?: "")
             }
         }
@@ -210,13 +219,13 @@ class ContactsViewModel @Inject constructor(
     sealed class ContactsUiState {
         data object None : ContactsUiState()
         data object Loading : ContactsUiState()
-        data class Success(val contacts: List<AutocompleteUser>?) : ContactsUiState()
+        data class Success(val contacts: List<AutocompleteUserDto>?) : ContactsUiState()
         data class Error(val message: String) : ContactsUiState()
     }
 
     sealed class RoomUiState {
         data object None : RoomUiState()
-        data class Success(val conversation: Conversation?) : RoomUiState()
+        data class Success(val conversation: ConversationDto?) : RoomUiState()
         data class Error(val message: String) : RoomUiState()
     }
 }

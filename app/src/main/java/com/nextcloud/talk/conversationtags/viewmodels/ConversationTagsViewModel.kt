@@ -15,8 +15,9 @@ import com.nextcloud.talk.conversationlist.data.OfflineConversationsRepository
 import com.nextcloud.talk.conversationlist.data.network.ConversationListUpdater
 import com.nextcloud.talk.conversationtags.data.ConversationTagsRepository
 import com.nextcloud.talk.data.user.model.User
+import com.nextcloud.talk.logger.Logger
 import com.nextcloud.talk.models.domain.ConversationModel
-import com.nextcloud.talk.models.json.tags.ConversationTag
+import com.nextcloud.talk.models.json.tags.ConversationTagDto
 import com.nextcloud.talk.models.json.tags.ConversationTagErrorOverall
 import com.nextcloud.talk.utils.ApiUtils
 import com.nextcloud.talk.utils.CapabilitiesUtil.hasSpreedFeatureCapability
@@ -36,14 +37,15 @@ class ConversationTagsViewModel @Inject constructor(
     private val conversationTagsRepository: ConversationTagsRepository,
     private val repository: OfflineConversationsRepository,
     private val currentUserProvider: CurrentUserProviderOld,
-    private val conversationListUpdater: ConversationListUpdater
+    private val conversationListUpdater: ConversationListUpdater,
+    private val logger: Logger
 ) : ViewModel() {
 
     private val currentUser: User = currentUserProvider.currentUser.blockingGet()
     private val credentials = ApiUtils.getCredentials(currentUser.username, currentUser.token) ?: ""
 
-    private val _conversationTagsFlow = MutableStateFlow<List<ConversationTag>>(emptyList())
-    val conversationTagsFlow: StateFlow<List<ConversationTag>> = _conversationTagsFlow.asStateFlow()
+    private val _conversationTagsFlow = MutableStateFlow<List<ConversationTagDto>>(emptyList())
+    val conversationTagsFlow: StateFlow<List<ConversationTagDto>> = _conversationTagsFlow.asStateFlow()
 
     sealed class TagActionUiState {
         data object None : TagActionUiState()
@@ -102,6 +104,7 @@ class ConversationTagsViewModel @Inject constructor(
                 }
                 _tagActionState.value = TagActionUiState.Success
             } catch (e: Exception) {
+                logger.e(TAG, "Failed to create conversation tag", e)
                 _tagActionState.value = TagActionUiState.Error(extractTagErrorType(e))
             }
         }
@@ -121,6 +124,7 @@ class ConversationTagsViewModel @Inject constructor(
                 }
                 _tagActionState.value = TagActionUiState.Success
             } catch (e: Exception) {
+                logger.e(TAG, "Failed to rename conversation tag", e)
                 _tagActionState.value = TagActionUiState.Error(extractTagErrorType(e))
             }
         }
@@ -137,6 +141,7 @@ class ConversationTagsViewModel @Inject constructor(
                 _conversationTagsFlow.value = _conversationTagsFlow.value.filter { it.id != tagId }
                 _tagActionState.value = TagActionUiState.Success
             } catch (e: Exception) {
+                logger.e(TAG, "Failed to delete conversation tag", e)
                 _tagActionState.value = TagActionUiState.Error(extractTagErrorType(e))
             }
         }
@@ -155,6 +160,7 @@ class ConversationTagsViewModel @Inject constructor(
                 }
                 _tagActionState.value = TagActionUiState.Success
             } catch (e: Exception) {
+                logger.e(TAG, "Failed to reorder conversation tags", e)
                 _tagActionState.value = TagActionUiState.Error(extractTagErrorType(e))
             }
         }
@@ -206,13 +212,13 @@ class ConversationTagsViewModel @Inject constructor(
     }
 
     private fun isCustomTag(tagId: String): Boolean =
-        _conversationTagsFlow.value.firstOrNull { it.id == tagId }?.type == ConversationTag.TYPE_CUSTOM
+        _conversationTagsFlow.value.firstOrNull { it.id == tagId }?.type == ConversationTagDto.TYPE_CUSTOM
 
     /** Drops the built-in "Other" tag (not surfaced in this UI) and sorts the rest by sortOrder. */
-    private fun List<ConversationTag>?.toDisplayTags(): List<ConversationTag> =
-        this?.filter { it.type != ConversationTag.TYPE_OTHER }?.sortedBy { it.sortOrder } ?: emptyList()
+    private fun List<ConversationTagDto>?.toDisplayTags(): List<ConversationTagDto> =
+        this?.filter { it.type != ConversationTagDto.TYPE_OTHER }?.sortedBy { it.sortOrder } ?: emptyList()
 
     companion object {
-        private val TAG = ConversationTagsViewModel::class.simpleName
+        private val TAG = ConversationTagsViewModel::class.java.simpleName
     }
 }

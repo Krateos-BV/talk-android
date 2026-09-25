@@ -1,7 +1,7 @@
 /*
  * Nextcloud Talk - Android Client
  *
- * SPDX-FileCopyrightText: 2026 Andy Scherzinger <andy.scherzinger@nextcloud.com>
+ * SPDX-FileCopyrightText: 2026 Andy Scherzinger <info@andy-scherzinger.de>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -18,12 +18,13 @@ import com.nextcloud.talk.data.network.NetworkMonitor
 import com.nextcloud.talk.data.source.local.TalkDatabase
 import com.nextcloud.talk.data.user.model.User
 import com.nextcloud.talk.data.user.model.UserEntity
-import com.nextcloud.talk.models.json.capabilities.Capabilities
-import com.nextcloud.talk.models.json.capabilities.SpreedCapability
-import com.nextcloud.talk.models.json.chat.ChatMessageJson
+import com.nextcloud.talk.logger.Logger
+import com.nextcloud.talk.models.json.capabilities.CapabilitiesDto
+import com.nextcloud.talk.models.json.capabilities.SpreedCapabilityDto
+import com.nextcloud.talk.models.json.chat.ChatMessageDto
 import com.nextcloud.talk.models.json.chat.ChatOCS
 import com.nextcloud.talk.models.json.chat.ChatOverall
-import com.nextcloud.talk.models.json.conversations.Conversation
+import com.nextcloud.talk.models.json.conversations.ConversationDto
 import com.nextcloud.talk.utils.ApiUtils
 import io.reactivex.Observable
 import io.reactivex.android.plugins.RxAndroidPlugins
@@ -71,7 +72,9 @@ class RoomListMessagePrefetchIntegrationTest {
         db = Room.inMemoryDatabaseBuilder(context, TalkDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        db.usersDao().saveUser(UserEntity(id = ACCOUNT_ID, userId = "me", username = "me", baseUrl = BASE_URL))
+        runBlocking {
+            db.usersDao().saveUser(UserEntity(id = ACCOUNT_ID, userId = "me", username = "me", baseUrl = BASE_URL))
+        }
 
         whenever(networkMonitor.isOnline).thenReturn(MutableStateFlow(true))
 
@@ -91,7 +94,8 @@ class RoomListMessagePrefetchIntegrationTest {
             networkMonitor,
             syncer,
             conversationListUpdater,
-            context
+            context,
+            mock<Logger>()
         )
     }
 
@@ -163,21 +167,21 @@ class RoomListMessagePrefetchIntegrationTest {
             username = "me",
             baseUrl = BASE_URL,
             token = "app-password",
-            capabilities = Capabilities().apply {
-                spreedCapability = SpreedCapability().apply { features = listOf("chat-keep-notifications") }
+            capabilities = CapabilitiesDto().apply {
+                spreedCapability = SpreedCapabilityDto().apply { features = listOf("chat-keep-notifications") }
             }
         )
 
-    private fun conversation(roomToken: String, unreadMessages: Int, lastMessageId: Long): Conversation =
-        Conversation(
+    private fun conversation(roomToken: String, unreadMessages: Int, lastMessageId: Long): ConversationDto =
+        ConversationDto(
             token = roomToken,
             lastActivity = lastMessageId,
             unreadMessages = unreadMessages,
             lastMessage = message(lastMessageId, roomToken)
         )
 
-    private fun message(id: Long, roomToken: String): ChatMessageJson =
-        ChatMessageJson(
+    private fun message(id: Long, roomToken: String): ChatMessageDto =
+        ChatMessageDto(
             id = id,
             token = roomToken,
             actorType = "users",
@@ -189,7 +193,7 @@ class RoomListMessagePrefetchIntegrationTest {
             systemMessageType = ChatMessage.SystemMessageType.DUMMY
         )
 
-    private fun overall(vararg messages: ChatMessageJson): ChatOverall =
+    private fun overall(vararg messages: ChatMessageDto): ChatOverall =
         ChatOverall(ocs = ChatOCS(meta = null, data = messages.toList()))
 
     private fun chatUrl(roomToken: String): String = ApiUtils.getUrlForChat(1, BASE_URL, roomToken)

@@ -16,7 +16,6 @@ import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.security.KeyChain
 import android.text.TextUtils
-import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -37,7 +36,7 @@ import com.nextcloud.talk.application.NextcloudTalkApplication.Companion.sharedA
 import com.nextcloud.talk.data.network.NetworkMonitor
 import com.nextcloud.talk.databinding.ActivityServerSelectionBinding
 import com.nextcloud.talk.models.json.capabilities.CapabilitiesOverall
-import com.nextcloud.talk.models.json.generic.Status
+import com.nextcloud.talk.models.json.generic.StatusDto
 import com.nextcloud.talk.users.UserManager
 import com.nextcloud.talk.utils.AccountUtils
 import com.nextcloud.talk.utils.ApiUtils
@@ -51,6 +50,7 @@ import io.reactivex.Observer
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
+import kotlinx.coroutines.runBlocking
 import java.security.cert.CertificateException
 import javax.inject.Inject
 
@@ -115,7 +115,7 @@ class ServerSelectionActivity : BaseActivity() {
             binding.certTextView.visibility = View.GONE
         }
 
-        val loggedInUsers = userManager.users.blockingGet()
+        val loggedInUsers = runBlocking { userManager.getUsers() }
         val availableAccounts = AccountUtils.findAvailableAccountsOnDevice(loggedInUsers)
 
         if (isImportAccountNameSet() && availableAccounts.isNotEmpty()) {
@@ -254,7 +254,7 @@ class ServerSelectionActivity : BaseActivity() {
         statusQueryDisposable = ncApi.getServerStatus(queryStatusUrl)
             .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
-            .subscribe({ status: Status ->
+            .subscribe({ status: StatusDto ->
                 val versionString: String = status.version!!.substring(0, status.version!!.indexOf("."))
                 val version: Int = versionString.toInt()
 
@@ -291,7 +291,7 @@ class ServerSelectionActivity : BaseActivity() {
             }
     }
 
-    private fun showErrorTextForStatus(status: Status) {
+    private fun showErrorTextForStatus(status: StatusDto) {
         if (!status.installed) {
             setErrorText(
                 String.format(
@@ -367,7 +367,7 @@ class ServerSelectionActivity : BaseActivity() {
                 }
 
                 override fun onError(e: Throwable) {
-                    Log.e(TAG, "Error while checking capabilities", e)
+                    logger.e(TAG, "Error while checking capabilities", e)
                     if (resources != null) {
                         runOnUiThread {
                             setErrorText(resources!!.getString(R.string.nc_common_error_sorry))
@@ -381,7 +381,7 @@ class ServerSelectionActivity : BaseActivity() {
             })
     }
 
-    private fun isServerStatusQueryable(status: Status): Boolean =
+    private fun isServerStatusQueryable(status: StatusDto): Boolean =
         status.installed && !status.maintenance && !status.needsUpgrade
 
     private fun setErrorText(text: String?) {

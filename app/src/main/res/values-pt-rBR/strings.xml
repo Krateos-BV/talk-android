@@ -697,6 +697,7 @@
     <string name="pinned_indefinitely">Fixada indefinidamente</string>
     <string name="pinned_message_options">Opções de mensagem</string>
     <string name="pinned_until">Fixada até</string>
+    <string name="play_pause_audio_file">Reproduzir/pausar arquivo de áudio</string>
     <string name="play_pause_voice_message">Reproduzir/pausar mensagem de voz</string>
     <string name="playback_speed_control">Controle de velocidade de reprodução</string>
     <string name="please_continue_the_login_process_in_the_browser">Por favor, continue o login no navegador</string>
@@ -719,6 +720,8 @@
     <string name="previously_set">Definido anteriormente</string>
     <string name="qr_code_error">Não foi possível ler o código QR</string>
     <string name="raise_hand">Levantar mão</string>
+    <string name="reaction_add_failed">Não foi possível adicionar a reação</string>
+    <string name="reaction_delete_failed">Não foi possível remover a reação</string>
     <string name="reaction_forbidden">Você não tem permissão para adicionar ou remover reações nesta conversa</string>
     <string name="reactions_tab_all">Todos</string>
     <string name="read_storage_no_permission">O compartilhamento de arquivos do armazenamento não é possível sem permissões</string>
@@ -789,6 +792,7 @@
     <string name="thisWeek">Esta semana</string>
     <string name="this_is_a_test_message">Esta é uma mensagem de teste</string>
     <string name="this_weekend">Este fim de semana</string>
+    <string name="thread">Fio</string>
     <string name="thread_cancel">Cancelar a criação do fio</string>
     <string name="thread_notifications">Notificações de fios</string>
     <string name="thread_reply">Resposta</string>

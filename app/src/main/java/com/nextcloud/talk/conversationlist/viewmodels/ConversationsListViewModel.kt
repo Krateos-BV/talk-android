@@ -21,13 +21,14 @@ import com.nextcloud.talk.conversationlist.ui.ConversationListEntry
 import com.nextcloud.talk.data.user.model.User
 import com.nextcloud.talk.invitation.data.InvitationsModel
 import com.nextcloud.talk.invitation.data.InvitationsRepository
+import com.nextcloud.talk.logger.Logger
 import com.nextcloud.talk.messagesearch.MessageSearchHelper
 import com.nextcloud.talk.messagesearch.MessageSearchHelper.MessageSearchResults
 import com.nextcloud.talk.models.domain.ConversationModel
-import com.nextcloud.talk.models.json.conversations.Conversation
+import com.nextcloud.talk.models.json.conversations.ConversationDto
 import com.nextcloud.talk.models.json.conversations.ConversationEnums
 import com.nextcloud.talk.models.json.converters.EnumActorTypeConverter
-import com.nextcloud.talk.models.json.participants.Participant
+import com.nextcloud.talk.models.json.participants.ParticipantDto
 import com.nextcloud.talk.openconversations.data.OpenConversationsRepository
 import com.nextcloud.talk.repositories.conversations.ConversationsRepository
 import com.nextcloud.talk.repositories.unifiedsearch.UnifiedSearchRepository
@@ -59,7 +60,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -80,7 +80,8 @@ class ConversationsListViewModel @Inject constructor(
     private val arbitraryStorageManager: ArbitraryStorageManager,
     var userManager: UserManager,
     private val conversationsRepository: ConversationsRepository,
-    private val conversationListUpdater: ConversationListUpdater
+    private val conversationListUpdater: ConversationListUpdater,
+    private val logger: Logger
 ) : ViewModel() {
 
     private val _currentUser = currentUserProvider.currentUser.blockingGet()
@@ -102,7 +103,7 @@ class ConversationsListViewModel @Inject constructor(
 
     sealed class OpenConversationsUiState {
         data object None : OpenConversationsUiState()
-        data class Success(val conversations: List<Conversation>) : OpenConversationsUiState()
+        data class Success(val conversations: List<ConversationDto>) : OpenConversationsUiState()
         data class Error(val exception: Throwable) : OpenConversationsUiState()
     }
 
@@ -401,11 +402,13 @@ class ConversationsListViewModel @Inject constructor(
         _federationInvitationHintVisible.value = false
         _showAvatarBadge.value = false
 
-        userManager.users.blockingGet()?.forEach {
-            invitationsRepository.fetchInvitations(it)
-                .subscribeOn(Schedulers.io())
-                ?.observeOn(AndroidSchedulers.mainThread())
-                ?.subscribe(FederatedInvitationsObserver())
+        viewModelScope.launch {
+            userManager.getUsers().forEach {
+                invitationsRepository.fetchInvitations(it)
+                    .subscribeOn(Schedulers.io())
+                    ?.observeOn(AndroidSchedulers.mainThread())
+                    ?.subscribe(FederatedInvitationsObserver())
+            }
         }
     }
 
@@ -428,13 +431,19 @@ class ConversationsListViewModel @Inject constructor(
 
         searchJob = viewModelScope.launch {
             combine(
-                getRoomsStateFlow.map { list ->
-                    list.filter { it.displayName?.contains(filter, ignoreCase = true) == true }
-                },
+                getRoomsStateFlow,
                 openConversationsRepository.fetchOpenConversationsFlow(currentUser, filter),
                 contactsRepository.getContactsFlow(currentUser, filter),
                 getMessagesFlow(filter)
-            ) { localConvs, openConvs, contacts, (messages, hasMore) ->
+            ) { rooms, fetchedOpenConvs, contacts, (messages, hasMore) ->
+                val localConvs = rooms
+                    .filter { it.displayName?.contains(filter, ignoreCase = true) == true }
+                    .distinctBy { it.token }
+                // Open conversations were fetched once, so a room joined afterwards would otherwise be listed twice
+                val joinedTokens = rooms.mapTo(HashSet()) { it.token }
+                val openConvs = fetchedOpenConvs
+                    .filter { it.token !in joinedTokens }
+                    .distinctBy { it.token }
                 val entries = mutableListOf<ConversationListEntry>()
                 val wordPattern = """\b${Regex.escape(filter)}\b""".toRegex(RegexOption.IGNORE_CASE)
 
@@ -468,7 +477,7 @@ class ConversationsListViewModel @Inject constructor(
                     entries.add(ConversationListEntry.Header(usersTitle))
                     sortedByMatchQuality(contacts, { it.label }, filter, wordPattern)
                         .forEach { autocompleteUser ->
-                            val participant = Participant()
+                            val participant = ParticipantDto()
                             participant.actorId = autocompleteUser.id
                             participant.actorType = actorTypeConverter.getFromString(autocompleteUser.source)
                             participant.displayName = autocompleteUser.label
@@ -603,6 +612,7 @@ class ConversationsListViewModel @Inject constructor(
                         ""
                     )
                 } catch (exception: Exception) {
+                    logger.e(TAG, "Failed to check whether followed threads exist", exception)
                     _threadsExistState.value = ThreadsExistUiState.Error(exception)
                 }
             }
@@ -696,7 +706,7 @@ class ConversationsListViewModel @Inject constructor(
             compareByDescending<ConversationModel> { it.favorite }
                 .thenByDescending { it.lastActivity }
         )
-        return sorted.map { ConversationListEntry.ConversationEntry(it) }
+        return sorted.distinctBy { it.token }.map { ConversationListEntry.ConversationEntry(it) }
     }
 
     /**
@@ -792,6 +802,7 @@ class ConversationsListViewModel @Inject constructor(
                 }
                 _readUnreadState.value = ConversationReadUnreadUiState.Success
             } catch (e: Exception) {
+                logger.e(TAG, "Failed to mark conversation as read", e)
                 messageId?.let { conversationListUpdater.clearPendingReadMarker(conversation.internalId, it) }
                 withContext(Dispatchers.IO) {
                     repository.updateConversation(original)
@@ -821,6 +832,7 @@ class ConversationsListViewModel @Inject constructor(
                 }
                 _readUnreadState.value = ConversationReadUnreadUiState.Success
             } catch (e: Exception) {
+                logger.e(TAG, "Failed to mark conversation as unread", e)
                 conversationListUpdater.clearPendingUnread(conversation.internalId)
                 withContext(Dispatchers.IO) {
                     repository.updateConversation(original)
@@ -862,6 +874,7 @@ class ConversationsListViewModel @Inject constructor(
                 }
                 _archiveState.value = ArchiveUiState.Success(desiredArchived, conversation.displayName)
             } catch (e: Exception) {
+                logger.e(TAG, "Failed to toggle conversation archive state", e)
                 conversationListUpdater.clearPendingArchived(conversation.internalId, desiredArchived)
                 withContext(Dispatchers.IO) {
                     repository.updateConversation(original)
@@ -888,6 +901,7 @@ class ConversationsListViewModel @Inject constructor(
                 }
                 _favoriteState.value = FavoriteUiState.Success
             } catch (e: Exception) {
+                logger.e(TAG, "Failed to add conversation to favorites", e)
                 conversationListUpdater.clearPendingFavorite(conversation.internalId, favorite = true)
                 withContext(Dispatchers.IO) {
                     repository.updateConversation(original)
@@ -914,6 +928,7 @@ class ConversationsListViewModel @Inject constructor(
                 }
                 _favoriteState.value = FavoriteUiState.Success
             } catch (e: Exception) {
+                logger.e(TAG, "Failed to remove conversation from favorites", e)
                 conversationListUpdater.clearPendingFavorite(conversation.internalId, favorite = false)
                 withContext(Dispatchers.IO) {
                     repository.updateConversation(original)
@@ -952,7 +967,7 @@ class ConversationsListViewModel @Inject constructor(
     }
 
     companion object {
-        private val TAG = ConversationsListViewModel::class.simpleName
+        private val TAG = ConversationsListViewModel::class.java.simpleName
         const val FOLLOWED_THREADS_EXIST_LAST_CHECK = "FOLLOWED_THREADS_EXIST_LAST_CHECK"
         const val FOLLOWED_THREADS_EXIST = "FOLLOWED_THREADS_EXIST"
         private const val SIXTEEN_HOURS_IN_SECONDS: Long = 57600

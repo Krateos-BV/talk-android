@@ -18,25 +18,26 @@ import com.nextcloud.talk.application.NextcloudTalkApplication
 import com.nextcloud.talk.chat.data.network.ChatNetworkDataSource
 import com.nextcloud.talk.conversationinfo.ConversationInfoUiEvent
 import com.nextcloud.talk.conversationinfo.ConversationInfoUiState
-import com.nextcloud.talk.conversationinfo.CreateRoomRequest
-import com.nextcloud.talk.conversationinfo.Participants
+import com.nextcloud.talk.conversationinfo.CreateRoomRequestDto
+import com.nextcloud.talk.conversationinfo.ParticipantsDto
 import com.nextcloud.talk.conversationinfo.model.ParticipantModel
 import com.nextcloud.talk.data.user.model.User
+import com.nextcloud.talk.logger.Logger
 import com.nextcloud.talk.models.domain.ConversationModel
 import com.nextcloud.talk.models.domain.converters.DomainEnumNotificationLevelConverter
-import com.nextcloud.talk.models.json.autocomplete.AutocompleteUser
-import com.nextcloud.talk.models.json.capabilities.SpreedCapability
+import com.nextcloud.talk.models.json.autocomplete.AutocompleteUserDto
+import com.nextcloud.talk.models.json.capabilities.SpreedCapabilityDto
 import com.nextcloud.talk.models.json.conversations.ConversationEnums
 import com.nextcloud.talk.models.json.generic.GenericOverall
-import com.nextcloud.talk.models.json.participants.Participant
-import com.nextcloud.talk.models.json.participants.Participant.ActorType.CIRCLES
-import com.nextcloud.talk.models.json.participants.Participant.ActorType.EMAILS
-import com.nextcloud.talk.models.json.participants.Participant.ActorType.FEDERATED
-import com.nextcloud.talk.models.json.participants.Participant.ActorType.GROUPS
-import com.nextcloud.talk.models.json.participants.Participant.ActorType.USERS
+import com.nextcloud.talk.models.json.participants.ParticipantDto
+import com.nextcloud.talk.models.json.participants.ParticipantDto.ActorType.CIRCLES
+import com.nextcloud.talk.models.json.participants.ParticipantDto.ActorType.EMAILS
+import com.nextcloud.talk.models.json.participants.ParticipantDto.ActorType.FEDERATED
+import com.nextcloud.talk.models.json.participants.ParticipantDto.ActorType.GROUPS
+import com.nextcloud.talk.models.json.participants.ParticipantDto.ActorType.USERS
 import com.nextcloud.talk.models.json.participants.ParticipantsOverall
-import com.nextcloud.talk.models.json.participants.TalkBan
-import com.nextcloud.talk.models.json.profile.Profile
+import com.nextcloud.talk.models.json.participants.TalkBanDto
+import com.nextcloud.talk.models.json.profile.ProfileDto
 import com.nextcloud.talk.passwordpolicy.PasswordPolicyValidator
 import com.nextcloud.talk.repositories.conversations.ConversationsRepository
 import com.nextcloud.talk.repositories.conversations.ConversationsRepository.ResendInvitationsResult
@@ -77,7 +78,8 @@ class ConversationInfoViewModel @Inject constructor(
     private val chatNetworkDataSource: ChatNetworkDataSource,
     private val conversationsRepository: ConversationsRepository,
     private val ncApi: NcApi,
-    private val passwordPolicyRepository: PasswordPolicyRepository
+    private val passwordPolicyRepository: PasswordPolicyRepository,
+    private val logger: Logger
 ) : ViewModel() {
     object LifeCycleObserver : DefaultLifecycleObserver {
         enum class LifeCycleFlag {
@@ -98,7 +100,7 @@ class ConversationInfoViewModel @Inject constructor(
         }
     }
     sealed interface ViewState
-    class ListBansSuccessState(val talkBans: List<TalkBan>) : ViewState
+    class ListBansSuccessState(val talkBans: List<TalkBanDto>) : ViewState
     object ListBansErrorState : ViewState
     private val _getTalkBanState: MutableLiveData<ViewState> = MutableLiveData()
     val getTalkBanState: LiveData<ViewState>
@@ -148,7 +150,7 @@ class ConversationInfoViewModel @Inject constructor(
     }
 
     @Suppress("DEPRECATION")
-    private fun processParticipants(participants: List<Participant>, userId: String?): List<ParticipantModel> {
+    private fun processParticipants(participants: List<ParticipantDto>, userId: String?): List<ParticipantModel> {
         val conversationType = _uiState.value.conversationType
         val uiItems: MutableList<ParticipantModel> = ArrayList()
         var ownUiItem: ParticipantModel? = null
@@ -187,7 +189,7 @@ class ConversationInfoViewModel @Inject constructor(
                 _uiState.update { it.copy(conversation = conversationModel) }
                 getCapabilities(user, token, conversationModel)
             } catch (e: Exception) {
-                Log.e(TAG, "Error when fetching room", e)
+                logger.e(TAG, "Error when fetching room", e)
                 _uiState.update { it.copy(isLoading = false) }
                 _uiEvent.emit(ConversationInfoUiEvent.ShowSnackbar(R.string.nc_common_error_sorry))
             }
@@ -197,15 +199,15 @@ class ConversationInfoViewModel @Inject constructor(
     @Suppress("Detekt.TooGenericExceptionCaught")
     fun createRoomFromOneToOne(
         user: User,
-        userItems: List<Participant>,
-        autocompleteUsers: List<AutocompleteUser>,
+        userItems: List<ParticipantDto>,
+        autocompleteUsers: List<AutocompleteUserDto>,
         roomToken: String
     ) {
         val apiVersion = ApiUtils.getConversationApiVersion(user, intArrayOf(ApiUtils.API_V4, 1))
         val url = getUrlForRooms(apiVersion, user.baseUrl!!)
         val credentials = ApiUtils.getCredentials(user.username, user.token)!!
         val participantsBody = convertAutocompleteUserToParticipant(autocompleteUsers)
-        val body = CreateRoomRequest(
+        val body = CreateRoomRequestDto(
             roomName = createConversationNameByParticipants(
                 userItems.map { it.displayName },
                 autocompleteUsers.map { it.label }
@@ -229,17 +231,18 @@ class ConversationInfoViewModel @Inject constructor(
                 if (token != null) {
                     _uiEvent.emit(ConversationInfoUiEvent.NavigateToChat(token))
                 } else {
+                    logger.e(TAG, "Failed to create room, response did not contain a token")
                     _uiEvent.emit(ConversationInfoUiEvent.ShowSnackbar(R.string.nc_common_error_sorry))
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to create room", e)
+                logger.e(TAG, "Failed to create room", e)
                 _uiEvent.emit(ConversationInfoUiEvent.ShowSnackbar(R.string.nc_common_error_sorry))
             }
         }
     }
 
-    private fun convertAutocompleteUserToParticipant(autocompleteUsers: List<AutocompleteUser>): Participants {
-        val participants = Participants()
+    private fun convertAutocompleteUserToParticipant(autocompleteUsers: List<AutocompleteUserDto>): ParticipantsDto {
+        val participants = ParticipantsDto()
         autocompleteUsers.forEach { autocompleteUser ->
             when (autocompleteUser.source) {
                 GROUPS.name.lowercase() -> participants.groups.add(autocompleteUser.id!!)
@@ -259,11 +262,11 @@ class ConversationInfoViewModel @Inject constructor(
             chatNetworkDataSource.getCapabilities(user, token)
                 .subscribeOn(Schedulers.io())
                 ?.observeOn(AndroidSchedulers.mainThread())
-                ?.subscribe(object : Observer<SpreedCapability> {
+                ?.subscribe(object : Observer<SpreedCapabilityDto> {
                     override fun onSubscribe(d: Disposable) {
                         LifeCycleObserver.disposableSet.add(d)
                     }
-                    override fun onNext(spreedCapabilities: SpreedCapability) {
+                    override fun onNext(spreedCapabilities: SpreedCapabilityDto) {
                         handleCapabilitiesSuccess(spreedCapabilities, conversationModel)
                     }
                     override fun onError(e: Throwable) {
@@ -278,7 +281,10 @@ class ConversationInfoViewModel @Inject constructor(
     }
 
     @Suppress("LongMethod", "ComplexMethod")
-    private fun handleCapabilitiesSuccess(spreedCapabilities: SpreedCapability, conversationModel: ConversationModel) {
+    private fun handleCapabilitiesSuccess(
+        spreedCapabilities: SpreedCapabilityDto,
+        conversationModel: ConversationModel
+    ) {
         val res = NextcloudTalkApplication.sharedApplication!!.resources
         val user = currentUser ?: return
         val token = currentToken
@@ -551,7 +557,7 @@ class ConversationInfoViewModel @Inject constructor(
             }
         }
     }
-    private fun processProfileData(profile: Profile) {
+    private fun processProfileData(profile: ProfileDto) {
         val pronouns = profile.pronouns ?: ""
         val concat1 = if (profile.role != null && profile.company != null) " @ " else ""
         val professionCompany = "${profile.role ?: ""}$concat1${profile.company ?: ""}"
@@ -682,7 +688,7 @@ class ConversationInfoViewModel @Inject constructor(
                 }
                 getRoom(user, token)
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to toggle archive state", e)
+                logger.e(TAG, "Failed to toggle archive state", e)
                 _uiEvent.emit(ConversationInfoUiEvent.ShowSnackbar(R.string.nc_common_error_sorry))
             }
         }
@@ -716,7 +722,7 @@ class ConversationInfoViewModel @Inject constructor(
                 }
                 override fun onNext(t: GenericOverall) { /* unused */ }
                 override fun onError(e: Throwable) {
-                    Log.e(TAG, "Failed to set lobby state", e)
+                    logger.e(TAG, "Failed to set lobby state", e)
                     _uiState.update {
                         it.copy(
                             lobbyEnabled = previousLobbyEnabled,
@@ -754,7 +760,7 @@ class ConversationInfoViewModel @Inject constructor(
                 }
                 override fun onNext(t: GenericOverall) { /* unused */ }
                 override fun onError(e: Throwable) {
-                    Log.e(TAG, "Failed to set lobby timer", e)
+                    logger.e(TAG, "Failed to set lobby timer", e)
                     viewModelScope.launch {
                         _uiEvent.emit(ConversationInfoUiEvent.ShowSnackbar(R.string.nc_common_error_sorry))
                     }
@@ -781,7 +787,7 @@ class ConversationInfoViewModel @Inject constructor(
                 }
                 override fun onNext(t: GenericOverall) { /* unused */ }
                 override fun onError(e: Throwable) {
-                    Log.e(TAG, "Error setting recording consent", e)
+                    logger.e(TAG, "Error setting recording consent", e)
                     _uiState.update { it.copy(recordingConsentForConversation = previousConsent) }
                     viewModelScope.launch {
                         _uiEvent.emit(ConversationInfoUiEvent.ShowSnackbar(R.string.nc_common_error_sorry))
@@ -806,6 +812,7 @@ class ConversationInfoViewModel @Inject constructor(
                 val url = ApiUtils.getUrlForConversationReadOnly(apiVersion, user.baseUrl!!, token)
                 conversationsRepository.setConversationReadOnly(user = user, url = url, state = if (newLocked) 1 else 0)
             } catch (exception: Exception) {
+                logger.e(TAG, "Failed to toggle read-only lock state", exception)
                 _uiState.update { it.copy(isConversationLocked = previousLocked) }
                 databaseStorageModule?.saveBoolean("lock_switch", previousLocked)
                 _uiEvent.emit(ConversationInfoUiEvent.ShowSnackbar(R.string.conversation_read_only_failed))
@@ -875,8 +882,8 @@ class ConversationInfoViewModel @Inject constructor(
                 }
             } catch (exception: Exception) {
                 _uiState.update { it.copy(importantConversation = previousValue) }
+                logger.e(TAG, "failed to toggle important conversation state", exception)
                 _uiEvent.emit(ConversationInfoUiEvent.ShowSnackbar(R.string.nc_common_error_sorry))
-                Log.e(TAG, "failed to toggle important conversation state", exception)
             }
         }
     }
@@ -895,8 +902,8 @@ class ConversationInfoViewModel @Inject constructor(
                 }
             } catch (exception: Exception) {
                 _uiState.update { it.copy(sensitiveConversation = previousValue) }
+                logger.e(TAG, "failed to toggle sensitive conversation state", exception)
                 _uiEvent.emit(ConversationInfoUiEvent.ShowSnackbar(R.string.nc_common_error_sorry))
-                Log.e(TAG, "failed to toggle sensitive conversation state", exception)
             }
         }
     }
@@ -908,14 +915,14 @@ class ConversationInfoViewModel @Inject constructor(
                 conversationsRepository.clearChatHistory(user, url)
                 _uiEvent.emit(ConversationInfoUiEvent.ShowSnackbar(R.string.nc_clear_history_success))
             } catch (exception: Exception) {
+                logger.e(TAG, "failed to clear chat history", exception)
                 _uiEvent.emit(ConversationInfoUiEvent.ShowSnackbar(R.string.nc_common_error_sorry))
-                Log.e(TAG, "failed to clear chat history", exception)
             }
         }
     }
 
     companion object {
-        private val TAG = ConversationInfoViewModel::class.simpleName
+        private val TAG = ConversationInfoViewModel::class.java.simpleName
         private const val NEW_CONVERSATION_PARTICIPANTS_SEPARATOR = ", "
         private const val EXTENDED_CONVERSATION = "extended_conversation"
         private const val GROUP_CONVERSATION_TYPE = "2"
@@ -925,9 +932,9 @@ class ConversationInfoViewModel @Inject constructor(
         private const val NOTIFICATION_LEVEL_NEVER: Int = 3
         private const val RECORDING_CONSENT_REQUIRED_FOR_CONVERSATION: Int = 1
         private val MODERATOR_PARTICIPANT_TYPES = setOf(
-            Participant.ParticipantType.OWNER,
-            Participant.ParticipantType.MODERATOR,
-            Participant.ParticipantType.GUEST_MODERATOR
+            ParticipantDto.ParticipantType.OWNER,
+            ParticipantDto.ParticipantType.MODERATOR,
+            ParticipantDto.ParticipantType.GUEST_MODERATOR
         )
 
         /**
@@ -938,7 +945,7 @@ class ConversationInfoViewModel @Inject constructor(
         val PARTICIPANT_COMPARATOR: Comparator<ParticipantModel> = compareBy(
             { it.participant.actorType == GROUPS || it.participant.actorType == CIRCLES },
             { !it.isOnline },
-            { it.participant.type != Participant.ParticipantType.OWNER },
+            { it.participant.type != ParticipantDto.ParticipantType.OWNER },
             { it.participant.type !in MODERATOR_PARTICIPANT_TYPES },
             { it.participant.displayName!!.lowercase(Locale.ROOT) }
         )

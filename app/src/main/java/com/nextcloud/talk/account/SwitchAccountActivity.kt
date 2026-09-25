@@ -12,6 +12,7 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.os.Bundle
 import androidx.core.graphics.drawable.toDrawable
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import autodagger.AutoInjector
 import com.nextcloud.talk.R
@@ -22,7 +23,7 @@ import com.nextcloud.talk.application.NextcloudTalkApplication.Companion.sharedA
 import com.nextcloud.talk.data.user.model.User
 import com.nextcloud.talk.databinding.ActivitySwitchAccountBinding
 import com.nextcloud.talk.models.ImportAccount
-import com.nextcloud.talk.models.json.participants.Participant
+import com.nextcloud.talk.models.json.participants.ParticipantDto
 import com.nextcloud.talk.conversationlist.DirectShareHelper
 import com.nextcloud.talk.users.UserManager
 import com.nextcloud.talk.utils.AccountUtils.findAvailableAccountsOnDevice
@@ -31,6 +32,7 @@ import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_BASE_URL
 import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_IS_ACCOUNT_IMPORT
 import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_TOKEN
 import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_USERNAME
+import kotlinx.coroutines.launch
 import java.net.CookieManager
 import javax.inject.Inject
 
@@ -93,50 +95,56 @@ class SwitchAccountActivity : BaseActivity() {
                 if (isAccountImport) {
                     reauthorizeFromImport(item.account)
                 } else {
-                    if (userManager.setUserAsActive(item.user!!).blockingGet()) {
-                        DirectShareHelper.removeAllShareTargetShortcuts(this@SwitchAccountActivity)
-                        cookieManager.cookieStore.removeAll()
-                        finish()
-                    }
-                }
-            }
-
-            var participant: Participant
-
-            if (!isAccountImport) {
-                for (user in userManager.users.blockingGet()) {
-                    if (!user.current) {
-                        val userId: String? = if (user.userId != null) {
-                            user.userId
-                        } else {
-                            user.username
+                    lifecycleScope.launch {
+                        if (userManager.setUserAsActive(item.user!!)) {
+                            DirectShareHelper.removeAllShareTargetShortcuts(this@SwitchAccountActivity)
+                            cookieManager.cookieStore.removeAll()
+                            finish()
                         }
-                        participant = Participant()
-                        participant.actorType = Participant.ActorType.USERS
-                        participant.actorId = userId
-                        participant.displayName = user.displayName
-                        userItems.add(AdvancedUserItem(participant, user, null, 0))
                     }
                 }
-            } else {
-                var account: Account
-                var importAccount: ImportAccount
-                var user: User
-                for (accountObject in findAvailableAccountsOnDevice(userManager.users.blockingGet())) {
-                    account = accountObject
-                    importAccount = getInformationFromAccount(account)
-                    participant = Participant()
-                    participant.actorType = Participant.ActorType.USERS
-                    participant.actorId = importAccount.getUsername()
-                    participant.displayName = importAccount.getUsername()
-                    user = User()
-                    user.baseUrl = importAccount.getBaseUrl()
-                    userItems.add(AdvancedUserItem(participant, user, account, 0))
-                }
             }
-            adapter!!.submitList(userItems)
+
+            lifecycleScope.launch {
+                var participant: ParticipantDto
+
+                if (!isAccountImport) {
+                    for (user in userManager.getUsers()) {
+                        if (!user.current) {
+                            val userId: String? = if (user.userId != null) {
+                                user.userId
+                            } else {
+                                user.username
+                            }
+                            participant = ParticipantDto()
+                            participant.actorType = ParticipantDto.ActorType.USERS
+                            participant.actorId = userId
+                            participant.displayName = user.displayName
+                            userItems.add(AdvancedUserItem(participant, user, null, 0))
+                        }
+                    }
+                } else {
+                    var account: Account
+                    var importAccount: ImportAccount
+                    var user: User
+                    for (accountObject in findAvailableAccountsOnDevice(userManager.getUsers())) {
+                        account = accountObject
+                        importAccount = getInformationFromAccount(account)
+                        participant = ParticipantDto()
+                        participant.actorType = ParticipantDto.ActorType.USERS
+                        participant.actorId = importAccount.getUsername()
+                        participant.displayName = importAccount.getUsername()
+                        user = User()
+                        user.baseUrl = importAccount.getBaseUrl()
+                        userItems.add(AdvancedUserItem(participant, user, account, 0))
+                    }
+                }
+                adapter!!.submitList(userItems)
+                prepareViews()
+            }
+        } else {
+            prepareViews()
         }
-        prepareViews()
     }
 
     private fun prepareViews() {
