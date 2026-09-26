@@ -136,7 +136,7 @@ jobs:
           jq -n \
             --arg title "Upstream sync: $UPSTREAM_COUNT new commit(s) from nextcloud/talk-android" \
             --arg head "upstream-sync/master" \
-            --arg base "master" \
+            --arg base "${{ github.event.repository.default_branch }}" \
             --arg body "$body" \
             '{title: $title, head: $head, base: $base, body: $body}' \
           | gh api --method POST "repos/${GITHUB_REPOSITORY}/pulls" --input - \
