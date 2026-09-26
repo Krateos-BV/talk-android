@@ -59,10 +59,10 @@ android {
         targetSdk = 36
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // mayor.minor.hotfix.increment (for increment: 01-50=Alpha / 51-89=RC / 90-99=stable)
-        // xx   .xxx  .xx    .xx
-        versionCode = 250010009
-        versionName = "25.1.0 Alpha 09"
+        // CalVer YY.M.D.ID; versionCode is the date-encoded integer YYMMDDID (ID zero-padded to 3 digits).
+        // Checked by scripts/xenia/checkVersion.py, which also documents the scheme's invariants.
+        versionCode = 260926000
+        versionName = "26.9.26.0"
 
         vectorDrawables.useSupportLibrary = true
 
