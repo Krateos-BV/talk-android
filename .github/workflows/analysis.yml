@@ -68,11 +68,9 @@ jobs:
                 env:
                     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                 run: |
+                    # org.gradle.jvmargs comes from the repository's gradle.properties; lint runs out of heap below it.
                     mkdir -p "$HOME/.gradle"
-                    {
-                        echo "org.gradle.jvmargs=-Xmx1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8"
-                        echo "org.gradle.configureondemand=true"
-                    } > "$HOME/.gradle/gradle.properties"
+                    echo "org.gradle.configureondemand=true" > "$HOME/.gradle/gradle.properties"
                     scripts/analysis/analysis-wrapper.sh "${{ steps.get-vars.outputs.branch }}" "${{ steps.get-vars.outputs.pr }}"
             -   name: Upload reports
                 if: ${{ always() }}
