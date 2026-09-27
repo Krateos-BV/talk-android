@@ -38,7 +38,19 @@ jobs:
                 uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
             -   name: Run unit tests with coverage
-                run: ./gradlew --no-daemon testGplayDebugUnit
+                # a step timeout fails the step, where a job timeout only cancels it
+                timeout-minutes: 20
+                run: |
+                    # thread dump of the test JVM, printed below if the run is still going by then
+                    (
+                        sleep 720
+                        for pid in $(jps -l | awk '/GradleWorkerMain/ {print $1}'); do jstack "$pid"; done
+                    ) > "$RUNNER_TEMP/thread-dump.txt" 2>&1 < /dev/null &
+                    ./gradlew --no-daemon testGplayDebugUnit
+
+            -   name: Print thread dump
+                if: ${{ failure() }}
+                run: cat "$RUNNER_TEMP/thread-dump.txt" 2>/dev/null || echo "no thread dump was taken"
 
             -   name: Upload test artifacts
                 if: ${{ failure() }}
