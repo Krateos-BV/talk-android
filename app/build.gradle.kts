@@ -115,6 +115,22 @@ android {
         unitTests.isReturnDefaultValues = true
     }
 
+    signingConfigs {
+        create("release") {
+            // Populated from ANDROID_KEYSTORE_B64/ANDROID_KEYSTORE_PASSWORD/ANDROID_KEY_ALIAS/
+            // ANDROID_KEY_PASSWORD (GitHub Actions secrets, decoded to a file by the release
+            // workflow). Local/CI builds without these env vars fall back to an unsigned
+            // release build so `assembleRelease` keeps working outside the release pipeline.
+            val keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+            if (!keystorePath.isNullOrBlank()) {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -122,6 +138,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (!System.getenv("ANDROID_KEYSTORE_PATH").isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
