@@ -8,10 +8,46 @@ This file provides guidance to all AI agents (Claude, Codex, Gemini, etc.) worki
 
 ## Nextcloud Contribution Policy
 
+> **Fork amendment (Krateos-BV).** This file is inherited from upstream
+> `nextcloud/talk-android`. In this fork, work is reviewed on the pull request
+> itself rather than before it is opened, so the agent opens its own PRs and
+> writes their descriptions (see "What this agent may do in this fork" below).
+> This fork also does not require a DCO sign-off (see "Developer Certificate of
+> Origin" below); every other rule in this policy stands unchanged.
+> **This amendment applies only to pull requests targeting
+> branches of `Krateos-BV/talk-android`.** Anything destined for an upstream
+> `nextcloud/*` repository follows the unmodified upstream policy, where a
+> human opens the PR and writes it in their own words.
+
 All contributions generated or assisted by this agent must fully comply with:
 
 - **[AI Contribution Policy](https://github.com/nextcloud/.github/blob/master/AI_POLICY.md)** — the primary reference for AI-specific rules, covering disclosure, author accountability, communication, security, licensing, code quality, and autonomous agent behavior.
 - **[Contribution Guidelines](https://github.com/nextcloud/.github/blob/master/CONTRIBUTING.md)** — covering testing requirements, the Developer Certificate of Origin (DCO), license headers, conventional commits, and translations. These apply in full to all contributions regardless of how they were produced.
+
+### Developer Certificate of Origin (DCO)
+
+Upstream `nextcloud/*` uses the DCO so that outside contributors certify they
+have the legal right to submit the code they send. That requirement does not
+carry over to this fork: `Krateos-BV/talk-android` does not accept outside
+contributions, and its sole maintainer is the same person directing the agent —
+the agent is that person's tool, not a separate legal contributor. There is no
+third party here whose right to submit needs certifying.
+
+So in this fork:
+
+- Do not use `git commit -s`, and do not add a `Signed-off-by` trailer to
+  commits or to PR descriptions.
+- Do not add sign-offs retroactively to commits that already exist. A DCO
+  certification is meant to be made by the contributor at the time of the
+  commit; adding one after the fact would be ceremony, not certification.
+- Contributions still carry the `Assisted-by:` trailer and the AI disclosure
+  required above — those record how the code was produced, which the DCO
+  never did.
+
+Anything destined for an upstream `nextcloud/*` repository still follows
+upstream's rule, where the **human** contributor signs off in their own name.
+The agent never writes a `Signed-off-by` line on anyone's behalf, in either
+repository.
 
 ### What this agent must always do
 
@@ -33,12 +69,22 @@ All contributions generated or assisted by this agent must fully comply with:
 
 ### What this agent must never do
 
-- Open issues, submit pull requests, post review comments, or send security reports autonomously. Every contribution must be reviewed and submitted by a human.
-- Add `Signed-off-by` tags to commits. Only the human contributor can certify the Developer Certificate of Origin.
+- Send security reports autonomously, or submit anything to an upstream `nextcloud/*` repository without a human opening it. (Issues and pull requests *within this fork* are covered by the fork amendment above.)
+- Add `Signed-off-by` tags to commits (see "Developer Certificate of Origin" above).
 - Generate or submit security reports without independent human verification. Report verified vulnerabilities via [HackerOne](https://hackerone.com/nextcloud), not as GitHub issues.
-- Write PR descriptions, review comments, or issue reports on behalf of the contributor. These must be in the contributor's own words.
+- Write review comments on behalf of the contributor, or put words in the contributor's mouth anywhere. Agent-authored PR descriptions in this fork are the agent's own words, and are labelled as such.
 - Fully automate the resolution of issues labeled [`good first issue`](https://github.com/issues?q=org%3Anextcloud+label%3A%22good+first+issue%22) or similar beginner-friendly labels.
 - Submit code that has not been reviewed and cleaned up by the contributor. Dead code, redundant logic, excessive comments, malformed or garbled characters (e.g. `�` replacement characters), and unrelated changes must be removed before submission.
+
+### What this agent may do in this fork
+
+- Open issues and pull requests against `Krateos-BV/talk-android` without
+  waiting for a human to do it, and write the PR description itself. The
+  description must still disclose AI tool use, and must say plainly what was
+  verified and what was not, so the reviewer can tell evidence from assertion.
+- Commit without a DCO sign-off. This fork does not use the Developer
+  Certificate of Origin, so neither the agent nor the contributor adds a
+  `Signed-off-by` trailer here.
 
 ---
 
@@ -84,13 +130,13 @@ Build output: `app/build/outputs/apk/`
 
 ## Build Flavors
 
-| Flavor    | App ID                   | Purpose                              |
-|-----------|--------------------------|--------------------------------------|
-| `generic` | `com.nextcloud.talk2`    | F-Droid release (no Google services) |
-| `gplay`   | `com.nextcloud.talk2`    | Google Play (Firebase push notifs)   |
-| `qa`      | `com.nextcloud.talk2.qa` | Per-PR testing builds                |
+| Flavor    | App ID                  | Purpose                            |
+|-----------|-------------------------|------------------------------------|
+| `generic` | `eu.xeniacloud.talk`    | Build without Google services      |
+| `gplay`   | `eu.xeniacloud.talk`    | Google Play (Firebase push notifs) |
+| `qa`      | `eu.xeniacloud.talk.qa` | Per-PR testing builds              |
 
-`gplay`-only dependencies (Firebase, play-services-base) use `gplayImplementation`. Avoid introducing Play-only dependencies into `generic` code paths. F-Droid (`generic`) builds do not support Google push notifications.
+`gplay`-only dependencies (Firebase, play-services-base) use `gplayImplementation`. Avoid introducing Play-only dependencies into `generic` code paths. `generic` builds do not support Google push notifications.
 
 ## Architecture
 
@@ -208,9 +254,9 @@ After finishing code changes, run `./gradlew detekt ktlintCheck` and fix any new
 
 ## Commits
 
-- All PRs target `master`. Backports use `/backport to stable-X.Y` in a PR comment.
+- PRs in this fork target `main`, the default branch of `Krateos-BV/talk-android`. Upstream `nextcloud/talk-android` is on `master`, where backports use `/backport to stable-X.Y` in a PR comment.
 
-- The DCO requires a `Signed-off-by` on every commit. This must be added by the **human contributor** (`git commit -s`) — the agent must never add it (see contribution policy above).
+- Commits are not signed off in this fork — do not use `git commit -s` or add a `Signed-off-by` trailer (see "Developer Certificate of Origin" above).
 
 - Commit messages must follow the [Conventional Commits v1.0.0 specification](https://www.conventionalcommits.org/en/v1.0.0/#specification) — e.g. `feat(chat): add voice message playback`, `fix(call): handle MCU disconnect gracefully`.
 
