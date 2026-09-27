@@ -8,6 +8,7 @@ import com.github.spotbugs.snom.Confidence
 import com.github.spotbugs.snom.Effort
 import com.github.spotbugs.snom.SpotBugsTask
 import io.gitlab.arturbosch.detekt.Detekt
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
     id("org.jetbrains.kotlin.plugin.compose") version "2.4.10"
@@ -60,6 +61,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // CalVer YY.M.D.ID; versionCode is the date-encoded integer YYMMDDID (ID zero-padded to 3 digits)
+        // Checked by scripts/xenia/checkVersion.py, which also documents the scheme's invariants.
         versionCode = 260926000
         versionName = "26.9.26.0"
 
@@ -104,6 +106,11 @@ android {
     testOptions {
         unitTests.all {
             it.useJUnitPlatform()
+            // one line per test, so a hanging test is named in the CI log
+            it.testLogging {
+                events("started", "failed", "skipped")
+                exceptionFormat = TestExceptionFormat.FULL
+            }
         }
         unitTests.isReturnDefaultValues = true
     }

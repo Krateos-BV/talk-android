@@ -11,6 +11,7 @@ import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import io.reactivex.android.plugins.RxAndroidPlugins
 import io.reactivex.plugins.RxJavaPlugins
 import io.reactivex.schedulers.Schedulers
+import org.junit.AfterClass
 import org.junit.BeforeClass
 import org.junit.Rule
 
@@ -35,6 +36,13 @@ open class AbstractViewModelTest {
             RxAndroidPlugins.setInitMainThreadSchedulerHandler {
                 Schedulers.trampoline()
             }
+        }
+
+        @JvmStatic
+        @AfterClass
+        fun tearDownClass() {
+            RxJavaPlugins.reset()
+            RxAndroidPlugins.reset()
         }
     }
 }

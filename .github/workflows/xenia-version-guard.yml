@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: 2026 Krateos BV
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: Version Guard
+
+# Fails when app/build.gradle.kts carries a version Google Play would reject,
+# now or on the next release: see scripts/xenia/checkVersion.py for the scheme
+# and each check. Needs no SDK or secrets, so it is cheap enough to be a
+# required status check.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: version-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  version-guard:
+    name: version-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Self-test the guard
+        run: scripts/xenia/checkVersion.py --self-test
+
+      - name: Check the version
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ -n "$BASE_REF" ]; then
+            git fetch --no-tags --depth=1 origin "$BASE_REF"
+            git show FETCH_HEAD:app/build.gradle.kts > "$RUNNER_TEMP/base.gradle.kts"
+            scripts/xenia/checkVersion.py --base "$RUNNER_TEMP/base.gradle.kts"
+          else
+            scripts/xenia/checkVersion.py
+          fi
