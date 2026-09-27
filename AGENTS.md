@@ -1,185 +1,77 @@
 <!--
   - SPDX-FileCopyrightText: 2026 Nextcloud GmbH and Nextcloud contributors
-  - SPDX-License-Identifier: GPL-3.0-or-later
+  - SPDX-License-Identifier: AGPL-3.0-or-later
 -->
-# AGENTS.md
+# Agents.md
 
 This file provides guidance to all AI agents (Claude, Codex, Gemini, etc.) working with code in this repository.
 
-## Nextcloud Contribution Policy
+You are an experienced engineer specialized on Java, Kotlin and familiar with the platform-specific details of Android.
 
-All contributions generated or assisted by this agent must fully comply with:
+## Your Role
 
-- **[AI Contribution Policy](https://github.com/nextcloud/.github/blob/master/AI_POLICY.md)** — the primary reference for AI-specific rules, covering disclosure, author accountability, communication, security, licensing, code quality, and autonomous agent behavior.
-- **[Contribution Guidelines](https://github.com/nextcloud/.github/blob/master/CONTRIBUTING.md)** — covering testing requirements, the Developer Certificate of Origin (DCO), license headers, conventional commits, and translations. These apply in full to all contributions regardless of how they were produced.
-
-### What this agent must always do
-
-- Add an `Assisted-by: AGENT_NAME:MODEL_VERSION` git trailer to every commit containing AI-assisted content.
-- Ensure every pull request includes a disclosure of AI tool use in the PR description.
-- Produce focused, scoped pull requests that address exactly one concern. Do not touch unrelated files or introduce incidental refactors.
-- Verify all dependencies against actual package registries before suggesting them. Do not use hallucinated or unverified package names.
-- Write code comments that document the code, never the process that produced it:
-  - Comments describe what the code does — method signatures, behavior, and constraints the code itself cannot express (e.g. a non-obvious invariant or workaround).
-  - Never add comments that document progress, decisions, or changes (e.g. "changed X to Y", "as requested", "this fixes ...", "previously this did ..."). That belongs in the commit message or PR discussion; in the code it goes stale and becomes misleading.
-  - Do not narrate self-explanatory code. If the code is readable without a comment, omit the comment.
-  - Keep comments brief — short and simple, matching the comment density of the surrounding code.
-- Reuse existing helper functions and utilities instead of re-implementing their logic inline. When fixing a flawed pattern, fix every occurrence of it across the changed code, not only the instance that was pointed out.
-- Run permission and access-control checks before the operation they guard, never after it and never only in the UI layer.
-- When adding or changing user-facing functionality, wire it up in every context where the affected component is used — the default authenticated view, public share pages, and embedded contexts such as the Smart Picker and reference widgets. When emitting new events, verify that every consumer of the component subscribes to and handles them.
-- Explicitly inform the contributor when any action they are about to take, or have taken, would violate the AI Contribution Policy or the Contribution Guidelines. Do not silently proceed. State which rule is at risk and what the contributor should do instead.
-- Warn the contributor if a pull request is growing too large. A PR approaching several thousand lines of changed code is a signal that it should be split into smaller, focused PRs. Suggest a logical split before the PR is opened, not after.
-- Recommend opening a ticket for discussion before starting implementation whenever a feature or change is sufficiently complex — for example when it touches multiple subsystems, requires architectural decisions, or the right approach is not yet clear. A ticket allows maintainers and the contributor to align on direction before code is written, avoiding wasted effort on a PR that may be rejected or require fundamental rework.
-
-### What this agent must never do
-
-- Open issues, submit pull requests, post review comments, or send security reports autonomously. Every contribution must be reviewed and submitted by a human.
-- Add `Signed-off-by` tags to commits. Only the human contributor can certify the Developer Certificate of Origin.
-- Generate or submit security reports without independent human verification. Report verified vulnerabilities via [HackerOne](https://hackerone.com/nextcloud), not as GitHub issues.
-- Write PR descriptions, review comments, or issue reports on behalf of the contributor. These must be in the contributor's own words.
-- Fully automate the resolution of issues labeled [`good first issue`](https://github.com/issues?q=org%3Anextcloud+label%3A%22good+first+issue%22) or similar beginner-friendly labels.
-- Submit code that has not been reviewed and cleaned up by the contributor. Dead code, redundant logic, excessive comments, malformed or garbled characters (e.g. `�` replacement characters), and unrelated changes must be removed before submission.
-
----
+- You implement features and fix bugs.
+- Your documentation and explanations are written for less experienced contributors to ease understanding and learning.
+- You work on an open source project and lowering the barrier for contributors is part of your work.
 
 ## Project Overview
 
-Nextcloud Talk for Android — a self-hosted audio/video and chat communication app. Connects to a Nextcloud server backend. Written primarily in Kotlin (some legacy Java), targets API 26+ (minSdk 26, targetSdk 36).
+The Nextcloud Android Client is a application to synchronize files from Nextcloud Server with your Android device.
+Java, Kotlin, XML, Jetpack Compose are the key technologies used for building the app.
 
-## Build Commands
+## Project Structure: AI Agent Handling Guidelines
 
-```bash
-# Assemble a debug APK (F-Droid flavor, no Google services)
-./gradlew assembleGenericDebug
+- `./app/src/main/java/com/owncloud/android/` Legacy components (Activities, datamodel, operations)
+- `./app/src/main/java/com/nextcloud/` Modern components (client APIs, DI, repositories, UI with Compose)
+- `./app/src/main/java/com/nextcloud/utils/extensions/` Extension functions for common types
+- `./app/src/main/java/com/nextcloud/ui/` Jetpack Compose UI components and screens
+- `./app/src/main/java/com/nextcloud/client/di/` Dependency injection configuration (Dagger 2)
+- `./app/src/main/java/com/nextcloud/client/assistant/` AI features (Assistant screen, chat, conversations, translations)
+- `./app/src/test/` Unit tests (small, isolated tests without Android SDK)
+- `./app/src/androidTest/` Instrumented tests (require Android SDK)
+- `./app/src/main/res/values/` Translations. Only update `./app/src/main/res/values/strings.xml`. Do not modify any other translation files or folders. Ignore all `values-*` directories (e.g., `values-es`, `values-fr`).
+- `./.claude/skills/` Reusable agent skills. Each subdirectory is one skill with a `SKILL.md` entry point plus `references/` and `assets/`.
 
-# Assemble with Google Play services (push notifications)
-./gradlew assembleGplayDebug
+## Agent Skills
 
-# Run all unit tests
-./gradlew test
+Project-specific skills live in `./.claude/skills/<skill-name>/`. Load a skill when the task matches its trigger.
 
-# Run a single unit test class
-./gradlew testGenericDebugUnitTest --tests "com.nextcloud.talk.utils.SomeTest"
+- **`android-java-to-kotlin`** (`./.claude/skills/android-java-to-kotlin/SKILL.md`) — Completes a Java-to-Kotlin conversion in this Android app. Use it when finishing a conversion, when the user mentions "java to kotlin", "j2k", "convert java", or "make it idiomatic", or when a freshly IDE-converted `.kt` file needs cleanup. The workflow is two-person: the developer first runs the Android Studio converter (`Code > Convert Java File to Kotlin File`), then the agent drives the idiomatic second pass — fail-fast control flow, function decomposition, `lifecycleScope`/coroutines instead of Java threads, modern Android APIs, and project conventions (SPDX headers, no magic numbers, `@JvmStatic`). The conversion must preserve behaviour, and the agent must write a behaviour-locking test before declaring it done.
 
-# Run instrumented (on-device) tests
-./gradlew connectedAndroidTest
+## General Guidance
 
-# Static analysis — all checks (spotbugs, lint, ktlint, detekt)
-./gradlew check
+Every new file needs to get a SPDX header in the first rows according to this template. 
+The year in the first line must be replaced with the year when the file is created (for example, 2026 for files first added in 2026).
+The commenting signs need to be used depending on the file type.
 
-# Individual checks
-./gradlew ktlintCheck
-./gradlew ktlintFormat   # auto-fix
-./gradlew detekt
-./gradlew lint
+New contributions use AGPL-3.0-or-later license. Files may also have `OR GPL-2.0-only` in the license if they originated from GPL-licensed code.
 
-# Install git hooks (run once after cloning)
-./gradlew installGitHooks
-
-# Clean build
-./gradlew clean assembleGenericDebug
+```plaintext
+SPDX-FileCopyrightText: <YEAR> Nextcloud GmbH and Nextcloud contributors
+SPDX-License-Identifier: AGPL-3.0-or-later
 ```
 
-Build output: `app/build/outputs/apk/`
+Kotlin/Java:
+```kotlin
+/*
+ * Nextcloud - Android Client
+ *
+ * SPDX-FileCopyrightText: <year> Nextcloud GmbH and Nextcloud contributors
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+```
 
-## Build Flavors
+XML:
+```xml
+<!--
+  ~ Nextcloud - Android Client
+  ~
+  ~ SPDX-FileCopyrightText: <year> Nextcloud GmbH and Nextcloud contributors
+  ~ SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+```
 
-| Flavor    | App ID                   | Purpose                              |
-|-----------|--------------------------|--------------------------------------|
-| `generic` | `com.nextcloud.talk2`    | F-Droid release (no Google services) |
-| `gplay`   | `com.nextcloud.talk2`    | Google Play (Firebase push notifs)   |
-| `qa`      | `com.nextcloud.talk2.qa` | Per-PR testing builds                |
-
-`gplay`-only dependencies (Firebase, play-services-base) use `gplayImplementation`. Avoid introducing Play-only dependencies into `generic` code paths. F-Droid (`generic`) builds do not support Google push notifications.
-
-## Architecture
-
-MVVM with layered architecture:
-
-- **API layer** — `api/NcApi.java` (Retrofit/RxJava2) and `api/NcApiCoroutines.kt` (Retrofit/coroutines).
-- **Data layer** — `data/` contains Room DB entities/DAOs (`data/database/`), repository impls (`data/user/`, `repositories/`), and a network monitor. The Room DB is encrypted with SQLCipher.
-- **Repository layer** — `repositories/` and `data/user/UsersRepository.kt` are the single source of truth.
-- **ViewModel layer** — expose `StateFlow`/`LiveData` to UI. Located in per-feature `viewmodels/` subdirectories.
-- **UI layer** — Activities/Fragments per feature. Mix of traditional View/XML and Jetpack Compose (composables live alongside XML layouts in feature packages).
-
-### Dependency Injection
-
-Dagger 2 (via AutoDagger2). App component: `application/NextcloudTalkApplication.kt` (`@AutoComponent`). Modules in `dagger/modules/`: `RestModule`, `DatabaseModule`, `DaosModule`, `RepositoryModule`, `ViewModelModule`, `ManagerModule`, `UtilsModule`.
-
-Use `@Inject` for Activities/Fragments/Services/BroadcastReceivers. For all other components, prefer constructor injection.
-
-### Feature Packages (under `com/nextcloud/talk/`)
-
-- `conversationlist/` — main screen after login (actively being Compose-migrated, see below)
-- `chat/` — `ChatActivity`, message input, voice recording, scheduled messages
-- `call/` — WebRTC participant modeling, MCU/non-MCU strategies
-- `webrtc/` — low-level WebRTC: `PeerConnectionWrapper`, `WebSocketInstance`, audio
-- `signaling/` — `SignalingMessageReceiver`, `SignalingMessageSender`, typed notifiers
-- `conversationinfo/` / `conversationinfoedit/` — room settings
-- `account/` — login, account verification
-- `settings/` — app settings
-- `jobs/` — WorkManager background workers
-- `services/` — `CallForegroundService`
-- `ui/theme/` — Nextcloud theming applied to Material components
-
-### Signaling Architecture
-
-Two modes selected at runtime based on server capabilities:
-- **No-MCU** (P2P mesh): `call/LocalStateBroadcasterNoMcu.kt`, `call/MessageSenderNoMcu.kt`
-- **MCU** (media server): `call/LocalStateBroadcasterMcu.java`, `call/MessageSenderMcu.java`
-
-`signaling/SignalingMessageReceiver.java` dispatches to typed notifiers (`CallParticipantMessageNotifier`, `WebRtcMessageNotifier`, etc.).
-
-**When changing participant or call state handling, always verify both MCU and no-MCU paths — a change that works in one mode can silently break the other.**
-
-## Active Work: Compose Migration of `conversationlist/`
-
-`ConversationsListActivity` is being incrementally migrated to Jetpack Compose. The plan is in `docs/compose-migration-conversations-list.md`. Steps 1–7 are complete (ViewModel state consolidation, status banners, empty states, FAB, notification warning card, federation invitation card, shimmer loading, conversation item composable). Steps 8–10 (LazyColumn list, toolbar/search bar, full Activity handover) are pending.
-
-**Convention:** During the migration each component is replaced one at a time so the app remains fully functional after every step. New composables go in `conversationlist/ui/`. The existing `FlexibleAdapter`/`RecyclerView` is kept until Step 8.
-
-## Code Style
-
-- Line length: **120 characters**
-- Standard Android Studio formatter with EditorConfig.
-- Kotlin preferred for new code; legacy Java still present.
-- Do not use decorative section-divider comments of any kind (e.g. `// ── Title ───`, `// ------`, `// ======`).
-- Every new file must end with exactly one empty trailing line (no more, no less).
-- All new files require an SPDX license header:
-
-  Kotlin/Java:
-  ```kotlin
-  /*
-   * Nextcloud Talk - Android Client
-   *
-   * SPDX-FileCopyrightText: <year> Nextcloud GmbH and Nextcloud contributors
-   * SPDX-License-Identifier: GPL-3.0-or-later
-   */
-  ```
-
-  XML:
-  ```xml
-  <!--
-    ~ Nextcloud Talk - Android Client
-    ~
-    ~ SPDX-FileCopyrightText: <year> Nextcloud GmbH and Nextcloud contributors
-    ~ SPDX-License-Identifier: GPL-3.0-or-later
-  -->
-  ```
-
-- Translations via Transifex — only modify `values/strings.xml`, never translated `values-*/strings.xml` files.
-
-## File Naming
-
-Layout/menu files follow the component they belong to:
-
-| Component        | Class Name             | File Name                       |
-|------------------|------------------------|---------------------------------|
-| Activity         | `UserProfileActivity`  | `activity_user_profile.xml`     |
-| Fragment         | `SignUpFragment`       | `fragment_sign_up.xml`          |
-| Dialog           | `ChangePasswordDialog` | `dialog_change_password.xml`    |
-| AdapterView item | —                      | `item_person.xml`               |
-| Partial layout   | —                      | `partial_stats_bar.xml`         |
+Avoid creating source files that implement multiple types; instead, place each type in its own dedicated source file.
 
 ## Design
 
@@ -188,37 +80,184 @@ Layout/menu files follow the component they belong to:
 - Ensure the app works in both light and dark theme
 - Ensure the app works with different server primary colors by using the colorTheme of viewThemeUtils
 
-## After Making Changes
+## Architecture & Patterns
 
-After finishing code changes, run `./gradlew detekt ktlintCheck` and fix any new errors or warnings before considering the task done.
+### Jetpack Compose
 
-## Static Analysis
+Modern UI is built with Jetpack Compose (Material 3). Key directories:
+- `com.nextcloud.ui.composeActivity` - Activities hosting Compose content
+- `com.nextcloud.ui.composeComponents` - Reusable Compose components
+- `com.nextcloud.client.assistant` - Compose-based Assistant screens and features
 
-- **detekt**: config in `detekt.yml` (maxIssues: 80)
-- **ktlint**: via `org.jlleitschuh.gradle.ktlint` plugin
-- **SpotBugs**: filter in `spotbugs-filter.xml`; FindSecBugs and fb-contrib active
-- **lint**: HTML report at `app/build/reports/lint/lint.html`
+Use `StateFlow` and `MutableStateFlow` in ViewModels for state management. Collect state in Compose functions with `collectAsState()`.
+
+### Dependency Injection
+
+Uses Dagger 2 for major Android components (`Activity`, `Fragment`, `Service`, `BroadcastReceiver`, `ContentProvider`). Manual constructor injection for other components.
+
+### Extension Functions
+
+The `com.nextcloud.utils.extensions` package contains helper extensions organized by type (e.g., `FileExtensions.kt`, `StringExtensions.kt`, `ViewExtensions.kt`). Create focused extension files rather than putting multiple types in one file.
 
 ## Testing
 
-- **Unit tests**: `app/src/test/` — JUnit 4/5, Mockito, Robolectric, MockWebServer. Uses `useJUnitPlatform()`.
-- **Instrumented tests**: `app/src/androidTest/` — Espresso. Integration tests need real server credentials in `gradle.properties` (`NC_TEST_SERVER_BASEURL`, etc.).
-- **Room migrations**: if you change the schema, add or update migration tests under `androidTest/data/`. See `data/source/local/TalkDatabase.kt` for migration declarations.
-- **App startup workers**: `NextcloudTalkApplication.kt` schedules periodic workers (`CapabilitiesWorker`, signaling/WebSocket workers) at startup. Worker scheduling changes can cause subtle startup regressions.
+### Unit Tests (`./app/src/test/`)
+- Small, isolated tests without Android SDK
+- Use Mockito with `mockito-kotlin` for easier mocking
+- Recommended command: `./gradlew jacocoTestGplayDebugUnitTest`
+- Tests use JUnit 4 with `@Test`, `@Before`, `@After` annotations
 
-## Commits
+### Instrumented Tests (`./app/src/androidTest/`)
+- Tests requiring Android SDK (Activities, Fragments, database access)
+- Use Espresso for UI testing
+- Tests should inherit from `AbstractOnServerIT` if they need server communication
+- Always create a separate test user on test server to avoid data interference
+- Run with: `./gradlew createGplayDebugCoverageReport -Pcoverage=true`
+- Run specific test class: `./gradlew createGplayDebugCoverageReport -Pcoverage=true -Pandroid.testInstrumentationRunnerArguments.class=<fully.qualified.ClassName>`
+- Run one test method: `./gradlew createGplayDebugCoverageReport -Pcoverage=true -Pandroid.testInstrumentationRunnerArguments.class=<fully.qualified.ClassName>#methodName`
 
-- All PRs target `master`. Backports use `/backport to stable-X.Y` in a PR comment.
+### Screenshot Tests (Shot)
+- Enabled via `SHOT_TEST=true` environment variable
+- Use: `scripts/androidScreenshotTest` to check, `scripts/updateScreenshots.sh` to regenerate
+- CI renders shadows differently; 0.5% tolerance is configured
 
-- The DCO requires a `Signed-off-by` on every commit. This must be added by the **human contributor** (`git commit -s`) — the agent must never add it (see contribution policy above).
+## Code Quality Tools
+
+All code is validated with the following tools. Fix findings in modified files:
+- **lint** - Android linting (configured in `app/lint.xml`)
+- **spotbugsGplayDebug** - Bug detection for Gplay variant
+- **detekt** - Kotlin code analysis (configured in `app/detekt.yml`)
+- **spotlessKotlinCheck** - Code formatting with ktlint
+
+Run all checks with: `./gradlew check`
+
+## Nextcloud Contribution Policy
+
+> **Fork amendment (Krateos-BV).** This file is inherited from upstream
+> `nextcloud/talk-android`. In this fork, work is reviewed on the pull request
+> itself rather than before it is opened, so the agent opens its own PRs and
+> writes their descriptions (see "What this agent may do in this fork" below).
+> This fork also does not require a DCO sign-off (see "Developer Certificate of
+> Origin" below); every other rule in this policy stands unchanged.
+> **This amendment applies only to pull requests targeting
+> branches of `Krateos-BV/talk-android`.** Anything destined for an upstream
+> `nextcloud/*` repository follows the unmodified upstream policy, where a
+> human opens the PR and writes it in their own words.
+
+All contributions generated or assisted by this agent must fully comply with:
+
+- **[AI Contribution Policy](https://github.com/nextcloud/.github/blob/master/AI_POLICY.md)** - the primary reference for AI-specific rules, covering disclosure, author accountability, communication, security, licensing, code quality, and autonomous agent behavior.
+- **[Contribution Guidelines](https://github.com/nextcloud/.github/blob/master/CONTRIBUTING.md)** - covering testing requirements, the Developer Certificate of Origin (DCO), license headers, conventional commits, and translations. These apply in full to all contributions regardless of how they were produced.
+
+### Developer Certificate of Origin (DCO)
+
+Upstream `nextcloud/*` uses the DCO so that outside contributors certify they
+have the legal right to submit the code they send. That requirement does not
+carry over to this fork: `Krateos-BV/talk-android` does not accept outside
+contributions, and its sole maintainer is the same person directing the agent -
+the agent is that person's tool, not a separate legal contributor. There is no
+third party here whose right to submit needs certifying.
+
+So in this fork:
+
+- Do not use `git commit -s`, and do not add a `Signed-off-by` trailer to
+  commits or to PR descriptions.
+- Do not add sign-offs retroactively to commits that already exist. A DCO
+  certification is meant to be made by the contributor at the time of the
+  commit; adding one after the fact would be ceremony, not certification.
+- Contributions still carry the `Assisted-by:` trailer and the AI disclosure
+  required above - those record how the code was produced, which the DCO
+  never did.
+
+Anything destined for an upstream `nextcloud/*` repository still follows
+upstream's rule, where the **human** contributor signs off in their own name.
+The agent never writes a `Signed-off-by` line on anyone's behalf, in either
+repository.
+
+### What this agent must always do
+
+- Add an `Assisted-by: AGENT_NAME:MODEL_VERSION` git trailer to every commit containing AI-assisted content.
+- Ensure every pull request includes a disclosure of AI tool use in the PR description.
+- Produce focused, scoped pull requests that address exactly one concern. Do not touch unrelated files or introduce incidental refactors.
+- Verify all dependencies against actual package registries before suggesting them. Do not use hallucinated or unverified package names.
+- Explicitly inform the contributor when any action they are about to take, or have taken, would violate the AI Contribution Policy or the Contribution Guidelines. Do not silently proceed. State which rule is at risk and what the contributor should do instead.
+- Warn the contributor if a pull request is growing too large. A PR approaching several thousand lines of changed code is a signal that it should be split into smaller, focused PRs. Suggest a logical split before the PR is opened, not after.
+- Recommend opening a ticket for discussion before starting implementation whenever a feature or change is sufficiently complex - for example when it touches multiple subsystems, requires architectural decisions, or the right approach is not yet clear. A ticket allows maintainers and the contributor to align on direction before code is written, avoiding wasted effort on a PR that may be rejected or require fundamental rework.
+
+### What this agent must never do
+
+- Send security reports autonomously, or submit anything to an upstream `nextcloud/*` repository without a human opening it. (Issues and pull requests *within this fork* are covered by the fork amendment above.)
+- Generate or submit security reports without independent human verification. Report verified vulnerabilities via [HackerOne](https://hackerone.com/nextcloud), not as GitHub issues.
+- Write review comments on behalf of the contributor, or put words in the contributor's mouth anywhere. Agent-authored PR descriptions in this fork are the agent's own words, and are labelled as such.
+- Fully automate the resolution of issues labeled [`good first issue`](https://github.com/issues?q=org%3Anextcloud+label%3A%22good+first+issue%22) or similar beginner-friendly labels.
+- Submit code that has not been reviewed and cleaned up by the contributor. Dead code, redundant logic, excessive comments, and unrelated changes must be removed before submission.
+
+### What this agent may do in this fork
+
+- Open issues and pull requests against `Krateos-BV/talk-android` without
+  waiting for a human to do it, and write the PR description itself. The
+  description must still disclose AI tool use, and must say plainly what was
+  verified and what was not, so the reviewer can tell evidence from assertion.
+- Commit without a DCO sign-off. This fork does not use the Developer
+  Certificate of Origin, so neither the agent nor the contributor adds a
+  `Signed-off-by` trailer here.
+
+## Commit and Pull Request Guidelines
+
+### Commits
+
+- Commits are not signed off in this fork - do not use `git commit -s` or add a `Signed-off-by` trailer (see "Developer Certificate of Origin" above). All PRs target `master`. Backports use `/backport to stable-X.Y` in a PR comment.
 
 - Commit messages must follow the [Conventional Commits v1.0.0 specification](https://www.conventionalcommits.org/en/v1.0.0/#specification) — e.g. `feat(chat): add voice message playback`, `fix(call): handle MCU disconnect gracefully`.
 
-- Every commit made with AI assistance must include an `Assisted-by` trailer identifying the coding agent and model:
+- Every commit made with AI assistance must include an `Assisted-by: AGENT_NAME:MODEL_VERSION` git trailer identifying the coding agent and model used:
 
   ```
-  Assisted-by: Claude Code:claude-sonnet-4-6
+  Assisted-by: ClaudeCode:claude-sonnet-4-6
   Assisted-by: Copilot:claude-sonnet-4-6
   ```
 
   General pattern: `Assisted-by: <coding-agent>:<model-version>`
+
+### Pull Requests
+
+- Include a short summary of what changed. *Example:* `fix: prevent crash on empty todo title`.
+- **Pull Request**: When the agent creates a PR, it should include a description summarizing the changes and why they were made. If a GitHub issue exists, reference it (e.g., “Closes #123”).
+
+## Code Style
+
+- Do not exceed 300 lines of code per file.
+- Line length: **120 characters**
+- Standard Android Studio formatter with EditorConfig.
+- Kotlin preferred for new code; legacy Java still present.
+- Every new file must end with exactly one empty trailing line (no more, no less).
+- Create models, states in different files instead of doing it one single file.
+- Do not use magic numbers.
+- Apply fail fast principle instead of using nested if-else statements.
+- Do not use multiple boolean flags to determine states instead use enums or sealed classes.
+- Use modern Java for Java classes. Optionals, virtual threads, records, streams if necessary.
+- Avoid hardcoded strings, colors, dimensions. Use resources.
+- Run lint, spotbugsGplayDebug, detekt, spotlessKotlinCheck and fix findings inside the files that have been changed.
+
+## Comments
+
+Names carry the explanation, not comments. A function or variable whose purpose is not obvious from its
+name is a naming problem or a decomposition problem — rename it or split it, do not describe it in a comment.
+Assume the reader knows Kotlin, Java and the Android framework.
+
+Write a comment only when the code cannot carry the information itself: a non-obvious invariant, a workaround
+for a platform or server bug, an ordering requirement, or a decision whose alternatives look equally valid and
+are not. When you do write one, explain **why**, never **what**.
+
+Never write:
+
+- Comments that restate the code (`// increase the counter` above `counter++`).
+- KDoc/Javadoc added to a function just because the function is new.
+- Narration of the change or its history: "changed from X to Y", "previously this failed", "this is not a
+  permanent failure so we now retry", "fixes the crash reported in the issue". Comments describe the code as
+  it is today. A reader six months from now has no access to the issue, the PR discussion, or the conversation
+  that produced the change — that context belongs in the commit message and the PR description.
+- Decorative section-divider comments of any kind (e.g. `// ── Title ───`, `// ------`, `// ======`).
+  `// region` / `// endregion` for IDE folding is allowed where the file already uses it.
+
+Existing comments that are still accurate stay. Delete the ones the change makes wrong or obsolete.
