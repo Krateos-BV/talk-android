@@ -3,7 +3,9 @@ name: "Xenia Release"
 on:
   push:
     tags:
-      - "v*"
+      # CalVer release tags, matching the versionName scheme already used in
+      # app/build.gradle.kts (defaultConfig versionCode/versionName), e.g. 26.9.26.0.
+      - "[0-9]*.[0-9]*.[0-9]*.[0-9]*"
 
 # Declare default permissions as read only.
 permissions: read-all
@@ -25,6 +27,21 @@ jobs:
 
       - name: Gradle validate
         uses: gradle/actions/wrapper-validation@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      # Same CalVer scheme as files-android's app/build.gradle.kts: versionName is the
+      # tag itself (YY.M.D.ID), versionCode is the date-encoded integer YYMMDDID with
+      # the ID zero-padded to 3 digits. Keyed off the "CalVer YY.M.D.ID" marker comment
+      # so only defaultConfig (not the qa flavor override) is touched.
+      - name: Derive CalVer version from tag
+        id: calver
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          IFS='.' read -r YY M D ID <<< "$TAG"
+          VERSION_NAME="$TAG"
+          VERSION_CODE=$(printf '%02d%02d%02d%03d' "$YY" "$M" "$D" "$ID")
+          echo "version-name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "version-code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          sed -i "/CalVer YY.M.D.ID/{n;s/versionCode = .*/versionCode = ${VERSION_CODE}/;n;s/versionName = .*/versionName = \"${VERSION_NAME}\"/}" app/build.gradle.kts
 
       - name: Decode keystore
         env:
@@ -53,6 +70,21 @@ jobs:
           name: talk-android-release-aab
           path: app/build/outputs/bundle/gplayRelease/*.aab
           retention-days: 5
+
+  # Build/signing above runs unattended. Publishing to Google Play requires manual
+  # approval via the play-release GitHub Environment (a required reviewer must approve
+  # the job before it starts). The environment's required-reviewers list itself is a
+  # repo-settings change and is not configured by this workflow file.
+  upload-google-play:
+    needs: release
+    runs-on: ubuntu-latest
+    environment: play-release
+    steps:
+      - name: Download AAB build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: talk-android-release-aab
+          path: app/build/outputs/bundle/gplayRelease
 
       - name: Upload to Google Play (internal testing)
         uses: r0adkll/upload-google-play@935ef9c684e2b7add0f11de6a1d24aede4c05230 # v1.1.3
