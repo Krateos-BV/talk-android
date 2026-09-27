@@ -26,6 +26,9 @@ source scripts/lib.sh
 echo "Branch: $BRANCH"
 
 if [ $spotbugsValue -eq 3 ]; then
+    if [ ! -f "$baselineXml" ]; then
+        echo "::error file=$baselineXml::Spotbugs baseline missing. Download gplayDebug.xml from this run's analysis-reports artifact, run scripts/analysis/spotbugsBaseline.py --file <it>, and commit $baselineXml."
+    fi
     exit 1
 fi
 
