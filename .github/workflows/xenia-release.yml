@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Krateos BV
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 name: "Xenia Release"
 
 on:
