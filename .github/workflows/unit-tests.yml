@@ -19,9 +19,14 @@ concurrency:
 
 jobs:
     test:
+<<<<<<< HEAD
         runs-on: ubuntu-latest
         # a hanging test otherwise holds the check at "in progress" for GitHub's 6h default
         timeout-minutes: 30
+=======
+        runs-on: ubuntu-latest-max
+        timeout-minutes: 45
+>>>>>>> upstream/master
         steps:
             -   name: Checkout
                 uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -60,10 +60,17 @@ android {
         targetSdk = 36
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+<<<<<<< HEAD
         // CalVer YY.M.D.ID; versionCode is the date-encoded integer YYMMDDID (ID zero-padded to 3 digits)
         // Checked by scripts/xenia/checkVersion.py, which also documents the scheme's invariants.
         versionCode = 260926000
         versionName = "26.9.26.0"
+=======
+        // mayor.minor.hotfix.increment (for increment: 01-50=Alpha / 51-89=RC / 90-99=stable)
+        // xx   .xxx  .xx    .xx
+        versionCode = 250010011
+        versionName = "25.1.0 Alpha 11"
+>>>>>>> upstream/master
 
         vectorDrawables.useSupportLibrary = true
 
@@ -106,11 +113,17 @@ android {
     testOptions {
         unitTests.all {
             it.useJUnitPlatform()
+<<<<<<< HEAD
             // one line per test, so a hanging test is named in the CI log
             it.testLogging {
                 events("started", "failed", "skipped")
                 exceptionFormat = TestExceptionFormat.FULL
             }
+=======
+            // Gradle's 512m default is too small for the Robolectric suites
+            it.maxHeapSize = "2g"
+            it.testLogging.events("started", "failed", "skipped")
+>>>>>>> upstream/master
         }
         unitTests.isReturnDefaultValues = true
     }
@@ -300,8 +313,6 @@ dependencies {
     implementation("androidx.room:room-ktx:$roomVersion")
 
     implementation("org.parceler:parceler-api:$parcelerVersion")
-    implementation("com.github.ddB0515.FlexibleAdapter:flexible-adapter:5.1.1")
-    implementation("com.github.ddB0515.FlexibleAdapter:flexible-adapter-ui:5.1.1")
     implementation("org.apache.commons:commons-lang3:3.20.0")
     implementation("com.google.code.findbugs:jsr305:3.0.2")
     implementation("joda-time:joda-time:2.14.3")
