@@ -34,7 +34,8 @@ jobs:
       # Same CalVer scheme as files-android's app/build.gradle.kts: versionName is the
       # tag itself (YY.M.D.ID), versionCode is the date-encoded integer YYMMDDID with
       # the ID zero-padded to 3 digits. Keyed off the "CalVer YY.M.D.ID" marker comment
-      # so only defaultConfig (not the qa flavor override) is touched.
+      # so only defaultConfig (not the qa flavor override) is touched; versionCode and
+      # versionName must be the two lines directly after it.
       - name: Derive CalVer version from tag
         id: calver
         run: |
@@ -45,6 +46,8 @@ jobs:
           echo "version-name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
           echo "version-code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           sed -i "/CalVer YY.M.D.ID/{n;s/versionCode = .*/versionCode = ${VERSION_CODE}/;n;s/versionName = .*/versionName = \"${VERSION_NAME}\"/}" app/build.gradle.kts
+          grep -qx "        versionCode = ${VERSION_CODE}" app/build.gradle.kts && grep -qx "        versionName = \"${VERSION_NAME}\"" app/build.gradle.kts \
+            || { echo "::error file=app/build.gradle.kts::CalVer sed did not set versionCode ${VERSION_CODE} / versionName ${VERSION_NAME}"; exit 1; }
 
       - name: Decode keystore
         env:

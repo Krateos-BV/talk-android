@@ -60,8 +60,8 @@ android {
         targetSdk = 36
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // CalVer YY.M.D.ID; versionCode is the date-encoded integer YYMMDDID (ID zero-padded to 3 digits)
         // Checked by scripts/xenia/checkVersion.py, which also documents the scheme's invariants.
+        // CalVer YY.M.D.ID; versionCode is the date-encoded integer YYMMDDID (ID zero-padded to 3 digits)
         versionCode = 260926000
         versionName = "26.9.26.0"
 
