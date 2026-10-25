@@ -2493,23 +2493,12 @@ class ChatActivity :
     }
 
     private fun requestReadFilesPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            requestPermissions(
-                arrayOf(
-                    Manifest.permission.READ_MEDIA_IMAGES,
-                    Manifest.permission.READ_MEDIA_VIDEO,
-                    Manifest.permission.READ_MEDIA_AUDIO
-                ),
-                REQUEST_SHARE_FILE_PERMISSION
-            )
-        } else {
-            requestPermissions(
-                arrayOf(
-                    Manifest.permission.READ_EXTERNAL_STORAGE
-                ),
-                REQUEST_SHARE_FILE_PERMISSION
-            )
-        }
+        requestPermissions(
+            arrayOf(
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            ),
+            REQUEST_SHARE_FILE_PERMISSION
+        )
     }
 
     private fun checkShowCallButtons() {
