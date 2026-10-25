@@ -87,6 +87,11 @@ class ContactAddressBookWorker(val context: Context, workerParameters: WorkerPar
             return Result.success()
         }
 
+        if (!isUploadAllowed()) {
+            Log.d(TAG, "Phone book integration is off, nothing is uploaded")
+            return Result.success()
+        }
+
         // Check if run already at the date
         val force = inputData.getBoolean(KEY_FORCE, false)
         if (!force) {
@@ -110,6 +115,11 @@ class ContactAddressBookWorker(val context: Context, workerParameters: WorkerPar
         val deviceContactsWithNumbers = collectContactsWithPhoneNumbersFromDevice()
 
         if (deviceContactsWithNumbers.isNotEmpty()) {
+            if (!isUploadAllowed()) {
+                Log.d(TAG, "Phone book integration was turned off while collecting contacts, nothing is uploaded")
+                return Result.success()
+            }
+
             val currentLocale = ConfigurationCompat.getLocales(context.resources.configuration)[0]!!.country
 
             val map = mutableMapOf<String, Any>()
@@ -146,6 +156,10 @@ class ContactAddressBookWorker(val context: Context, workerParameters: WorkerPar
                                 ).show()
                             }
                             else -> {
+                                if (!isUploadAllowed()) {
+                                    Log.d(TAG, "Phone book integration was turned off, no contacts are linked")
+                                    return
+                                }
                                 val contactsWithAssociatedPhoneNumbers = foundContacts.ocs!!.map
                                 deleteLinkedAccounts(contactsWithAssociatedPhoneNumbers)
                                 createLinkedAccounts(contactsWithAssociatedPhoneNumbers)
@@ -164,6 +178,9 @@ class ContactAddressBookWorker(val context: Context, workerParameters: WorkerPar
 
         return Result.success()
     }
+
+    /** True while the user has phone book integration switched on and this work has not been stopped. */
+    internal fun isUploadAllowed(): Boolean = !isStopped && appPreferences.isPhoneBookIntegrationEnabled
 
     private fun collectContactsWithPhoneNumbersFromDevice(): MutableMap<String, List<String>> {
         val deviceContactsWithNumbers: MutableMap<String, List<String>> = mutableMapOf()
@@ -456,20 +473,37 @@ class ContactAddressBookWorker(val context: Context, workerParameters: WorkerPar
         const val REQUEST_PERMISSION = 231
         const val KEY_FORCE = "KEY_FORCE"
         const val DELETE_ALL = "DELETE_ALL"
+        const val TAG_UPLOAD = "ContactAddressBookUpload"
         private const val HTTP_CODE_TOO_MANY_REQUESTS: Int = 429
 
-        fun run(context: Context) {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) ==
+        /**
+         * Starts the daily phone book upload, but only while the user has the phone book
+         * integration switched on and both contacts permissions are granted.
+         */
+        fun run(
+            context: Context,
+            appPreferences: AppPreferences,
+            workManager: WorkManager = WorkManager.getInstance(context)
+        ) {
+            if (appPreferences.isPhoneBookIntegrationEnabled &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) ==
                 PackageManager.PERMISSION_GRANTED &&
                 ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) ==
                 PackageManager.PERMISSION_GRANTED
             ) {
-                WorkManager.getInstance().enqueue(
-                    OneTimeWorkRequest.Builder(ContactAddressBookWorker::class.java)
-                        .setInputData(Data.Builder().putBoolean(KEY_FORCE, false).build()).build()
-                )
+                workManager.enqueue(uploadRequest(force = false))
             }
         }
+
+        fun enqueueUpload(context: Context, force: Boolean) {
+            WorkManager.getInstance(context).enqueue(uploadRequest(force))
+        }
+
+        private fun uploadRequest(force: Boolean): OneTimeWorkRequest =
+            OneTimeWorkRequest.Builder(ContactAddressBookWorker::class.java)
+                .setInputData(Data.Builder().putBoolean(KEY_FORCE, force).build())
+                .addTag(TAG_UPLOAD)
+                .build()
 
         fun checkPermission(activity: Activity, context: Context): Boolean {
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) !=
@@ -483,20 +517,14 @@ class ContactAddressBookWorker(val context: Context, workerParameters: WorkerPar
                 )
                 return false
             } else {
-                WorkManager
-                    .getInstance()
-                    .enqueue(
-                        OneTimeWorkRequest.Builder(ContactAddressBookWorker::class.java)
-                            .setInputData(Data.Builder().putBoolean(KEY_FORCE, true).build())
-                            .build()
-                    )
+                enqueueUpload(context, force = true)
                 return true
             }
         }
 
-        fun deleteAll() {
-            WorkManager
-                .getInstance()
+        fun deleteAll(workManager: WorkManager = WorkManager.getInstance()) {
+            workManager.cancelAllWorkByTag(TAG_UPLOAD)
+            workManager
                 .enqueue(
                     OneTimeWorkRequest.Builder(ContactAddressBookWorker::class.java)
                         .setInputData(Data.Builder().putBoolean(DELETE_ALL, true).build())

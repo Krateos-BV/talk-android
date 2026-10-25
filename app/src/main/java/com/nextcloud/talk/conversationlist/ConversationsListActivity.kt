@@ -283,7 +283,7 @@ class ConversationsListActivity : BaseActivity() {
                 fetchPendingInvitations()
             },
             onFabClick = {
-                run(context)
+                run(context, appPreferences)
                 showNewConversationsScreen()
             },
             onUnreadBubbleClick = {
