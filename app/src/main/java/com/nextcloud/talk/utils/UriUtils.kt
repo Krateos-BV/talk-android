@@ -13,6 +13,17 @@ class UriUtils {
     companion object {
         fun hasHttpProtocolPrefixed(uri: String): Boolean = uri.startsWith("http://") || uri.startsWith("https://")
 
+        /**
+         * Returns the https URL for a server address typed by the user, adding https:// when no scheme is
+         * given. Returns null for a cleartext http:// address, which the app does not connect to.
+         */
+        fun toSecureServerUrl(url: String): String? =
+            when {
+                url.startsWith("https://", ignoreCase = true) -> url
+                url.startsWith("http://", ignoreCase = true) -> null
+                else -> "https://$url"
+            }
+
         fun extractInstanceInternalFileFileId(url: String): String {
             // https://cloud.nextcloud.com/apps/files/?dir=/Engineering&fileid=41
             return url.toUri().getQueryParameter("fileid").toString()

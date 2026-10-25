@@ -28,4 +28,20 @@ class UriUtilsTest {
         val link = UriUtils.getMessageLink("https://example.com/nextcloud", "token1", 7)
         Assert.assertEquals("https://example.com/nextcloud/call/token1#message_7", link)
     }
+
+    @Test
+    fun toSecureServerUrl_keepsHttpsAddress() {
+        Assert.assertEquals("https://cloud.example.com", UriUtils.toSecureServerUrl("https://cloud.example.com"))
+    }
+
+    @Test
+    fun toSecureServerUrl_addsHttpsToAddressWithoutScheme() {
+        Assert.assertEquals("https://cloud.example.com", UriUtils.toSecureServerUrl("cloud.example.com"))
+    }
+
+    @Test
+    fun toSecureServerUrl_refusesCleartextHttpAddress() {
+        Assert.assertNull(UriUtils.toSecureServerUrl("http://cloud.example.com"))
+        Assert.assertNull(UriUtils.toSecureServerUrl("HTTP://cloud.example.com"))
+    }
 }

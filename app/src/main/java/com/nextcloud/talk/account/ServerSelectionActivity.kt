@@ -241,14 +241,15 @@ class ServerSelectionActivity : BaseActivity() {
             url = url.substring(0, url.length - 1)
         }
 
-        if (UriUtils.hasHttpProtocolPrefixed(url)) {
-            checkServer(url, false)
-        } else {
-            checkServer("https://$url", true)
+        val secureUrl = UriUtils.toSecureServerUrl(url)
+        if (secureUrl == null) {
+            setErrorText(resources!!.getString(R.string.nc_server_https_required))
+            return
         }
+        checkServer(secureUrl)
     }
 
-    private fun checkServer(url: String, checkForcedHttps: Boolean) {
+    private fun checkServer(url: String) {
         val queryStatusUrl = url + ApiUtils.getUrlPostfixForStatus()
 
         statusQueryDisposable = ncApi.getServerStatus(queryStatusUrl)
@@ -264,23 +265,19 @@ class ServerSelectionActivity : BaseActivity() {
                     showErrorTextForStatus(status)
                 }
             }, { throwable: Throwable ->
-                if (checkForcedHttps) {
-                    checkServer(queryStatusUrl.replace("https://", "http://"), false)
+                if (throwable.localizedMessage != null) {
+                    setErrorText(throwable.localizedMessage)
+                } else if (throwable.cause is CertificateException) {
+                    setErrorText(resources!!.getString(R.string.nc_certificate_error))
                 } else {
-                    if (throwable.localizedMessage != null) {
-                        setErrorText(throwable.localizedMessage)
-                    } else if (throwable.cause is CertificateException) {
-                        setErrorText(resources!!.getString(R.string.nc_certificate_error))
-                    } else {
-                        hideserverEntryProgressBar()
-                    }
-
-                    if (binding.importOrChooseProviderText.visibility != View.INVISIBLE) {
-                        binding.importOrChooseProviderText.visibility = View.VISIBLE
-                        binding.certTextView.visibility = View.VISIBLE
-                    }
-                    dispose()
+                    hideserverEntryProgressBar()
                 }
+
+                if (binding.importOrChooseProviderText.visibility != View.INVISIBLE) {
+                    binding.importOrChooseProviderText.visibility = View.VISIBLE
+                    binding.certTextView.visibility = View.VISIBLE
+                }
+                dispose()
             }) {
                 hideserverEntryProgressBar()
                 if (binding.importOrChooseProviderText.visibility != View.INVISIBLE) {
