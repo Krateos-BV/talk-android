@@ -32,6 +32,9 @@ How to translate with transifex:
     <string name="nc_common_set">Set</string>
     <string name="nc_common_dismiss">Dismiss</string>
     <string name="nc_common_error_sorry">Sorry, something went wrong!</string>
+    <string name="nc_login_too_many_attempts">Too many failed login attempts from this network. Try again later.</string>
+    <string name="nc_account_removal_pending">The removal of this account is not finished yet. Please try again in a moment.</string>
+    <string name="nc_reauthorize_different_account">You logged in with a different account. Log in with the account you want to reauthorize.</string>
     <string name="nc_common_create">Create</string>
     <string name="nc_common_unknown">Unknown</string>
     <string name="nc_common_disabled">Disabled</string>
@@ -55,6 +58,9 @@ How to translate with transifex:
     <string name="nc_server_helper_text">The link to your %1$s web interface when you open it in the browser.</string>
     <string name="nc_server_testing_connection">Testing connection</string>
     <string name="nc_server_unsupported">Server does not have supported Talk app installed</string>
+    <string name="nc_server_http_fallback_title">Insecure connection</string>
+    <string name="nc_server_http_fallback_message">Could not connect to the server over HTTPS. Connect over unsecured HTTP instead?</string>
+    <string name="nc_server_http_fallback_confirm">Use HTTP</string>
 
     <string name="nc_server_url">Server address https://…</string>
     <string name="nc_server_not_installed">Please finish your %1$s installation</string>
@@ -91,7 +97,7 @@ How to translate with transifex:
     <string name="nc_admin_only">Admin only</string>
 
     <string name="nc_certificate_dialog_title">Check out the certificate</string>
-    <string name="nc_certificate_dialog_text">Do you trust the until now unknown SSL certificate, issued by %1$s for %2$s, valid from %3$s to %4$s?</string>
+    <string name="nc_certificate_dialog_text_for_host">Do you trust the until now unknown SSL certificate of %1$s, issued by %2$s for %3$s, valid from %4$s to %5$s? It will only be trusted for %1$s.</string>
     <string name="nc_certificate_error">Your SSL setup prevented connection</string>
 
     <!-- Settings -->
@@ -425,6 +431,9 @@ How to translate with transifex:
     <string name="nc_call_button_content_description_answer_voice_only">Answer as voice call only</string>
     <string name="nc_call_button_content_description_answer_video_call">Answer as video call</string>
     <string name="nc_call_button_content_description_switch_to_self_vide">Switch to self video</string>
+    <string name="nc_call_button_content_description_switch_camera">Switch camera</string>
+    <string name="nc_call_self_video_enlarge">Enlarge self video</string>
+    <string name="nc_call_self_video_shrink">Shrink self video</string>
     <string name="nc_call_raised_hand">%1$s raised the hand</string>
     <string name="raise_hand">Raise hand</string>
     <string name="lower_hand">Lower hand</string>
@@ -558,6 +567,7 @@ How to translate with transifex:
     <string name="nc_scheduled_thread">Scheduled thread</string>
     <string name="nc_reply_to_thread">Reply to thread: %1$s</string>
     <string name="nc_message_added_to_notes">Message added to notes</string>
+    <string name="nc_message_not_added_to_notes">Could not add the message to notes</string>
     <string name="nc_message_failed">Failed to send message</string>
     <string name="nc_message_failed_to_send">Failed to send message:</string>
     <string name="nc_add_attachment">Add attachment</string>
@@ -721,7 +731,6 @@ How to translate with transifex:
     <!-- location sharing -->
     <string name="nc_share_location">Share location</string>
     <string name="nc_search_location">Search location</string>
-    <string name="nc_location_permission_required">location permission is required</string>
     <string name="nc_share_current_location">Share current location</string>
     <string name="nc_share_this_location">Share this location</string>
     <string name="nc_shared_location">Shared location</string>
@@ -748,6 +757,23 @@ How to translate with transifex:
     <string name="nc_voice_message_missing_audio_permission">Permission for audio recording is required</string>
     <string name="playback_speed_control">Playback speed control</string>
     <string name="delete_voice_recording">Delete voice recording</string>
+    <string name="nc_audio_seek">Playback position</string>
+    <string name="nc_audio_retry">Retry playback</string>
+    <string name="nc_audio_player_play_pause">Play/pause</string>
+    <string name="nc_audio_player_close">Stop playback</string>
+    <string name="nc_audio_player_show_message">Show message</string>
+    <string name="nc_audio_player_open">Open player</string>
+    <string name="nc_audio_player_previous">Previous</string>
+    <string name="nc_audio_player_next">Next</string>
+    <string name="nc_audio_player_shuffle">Shuffle</string>
+    <string name="nc_audio_player_repeat_off">Repeat off</string>
+    <string name="nc_audio_player_repeat_all">Repeat all</string>
+    <string name="nc_audio_player_repeat_one">Repeat one</string>
+    <string name="nc_audio_player_queue">Playlist</string>
+    <string name="nc_audio_error_network">Could not load the audio. Check your connection.</string>
+    <string name="nc_audio_error_unavailable">The audio file is not available</string>
+    <string name="nc_audio_error_unsupported">The audio format is not supported</string>
+    <string name="nc_audio_error_generic">Could not play the audio</string>
 
     <!-- Phonebook Integration -->
     <string name="nc_settings_phone_book_integration_desc">Match contacts based on phone number to integrate Talk shortcut into system contacts app</string>
@@ -885,8 +911,6 @@ How to translate with transifex:
     <string name="messages">Messages</string>
     <string name="load_more_results">Load more results</string>
     <string name="message_search_hint">Search …</string>
-    <string name="message_search_begin_typing">Start typing to search …</string>
-    <string name="message_search_begin_empty">No search results</string>
     <string name="message_search_previous_result">Previous search result</string>
     <string name="message_search_next_result">Next search result</string>
     <string name="message_search_no_more_results">No more messages found</string>
@@ -1084,9 +1108,7 @@ How to translate with transifex:
     <string name="qr_code_error">QR code could not be read</string>
     <string name="message_delete_are_you_sure">Are you sure you want to delete this message?</string>
     <string name="location_permission_denied">Location permission denied</string>
-    <string name="location_permission_denied_msg">Please enable it in the app settings</string>
     <string name="location_services_disabled">Location services disabled</string>
-    <string name="location_services_disabled_msg">Please enable location services (GPS) to use this feature</string>
     <string name="please_continue_the_login_process_in_the_browser">Please continue login in browser</string>
     <string name="pin_message">Pin message</string>
     <string name="unpin_message">Unpin message</string>

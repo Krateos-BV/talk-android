@@ -39,6 +39,7 @@ import com.nextcloud.talk.diagnosis.toMarkdown
 import com.nextcloud.talk.errorhandling.ExceptionHandler
 import com.nextcloud.talk.logger.LoggerImpl
 import com.nextcloud.talk.account.BrowserLoginActivity
+import com.nextcloud.talk.dagger.modules.ApplicationScope
 import com.nextcloud.talk.dagger.modules.BusModule
 import com.nextcloud.talk.dagger.modules.ContextModule
 import com.nextcloud.talk.dagger.modules.DaosModule
@@ -50,6 +51,7 @@ import com.nextcloud.talk.dagger.modules.UtilsModule
 import com.nextcloud.talk.dagger.modules.ViewModelModule
 import com.nextcloud.talk.filebrowser.webdav.DavUtils
 import com.nextcloud.talk.jobs.AccountRemovalWorker
+import com.nextcloud.talk.jobs.ConversationsSyncWorker
 import com.nextcloud.talk.jobs.CapabilitiesSyncWorker
 import com.nextcloud.talk.jobs.SignalingSettingsWorker
 import com.nextcloud.talk.jobs.WebsocketConnectionsWorker
@@ -65,6 +67,8 @@ import de.cotech.hw.SecurityKeyManager
 import de.cotech.hw.SecurityKeyManagerConfig
 import io.reactivex.exceptions.UndeliverableException
 import io.reactivex.plugins.RxJavaPlugins
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import org.conscrypt.Conscrypt
 import org.webrtc.PeerConnectionFactory
@@ -111,6 +115,10 @@ class NextcloudTalkApplication :
 
     @Inject
     lateinit var userManager: UserManager
+
+    @Inject
+    @field:ApplicationScope
+    lateinit var appScope: CoroutineScope
 
     @Inject
     lateinit var logger: LoggerImpl
@@ -240,6 +248,8 @@ class NextcloudTalkApplication :
     }
 
     private fun initWorkers() {
+        appScope.launch { userManager.repairMultipleActiveUsers() }
+
         val accountRemovalWork = OneTimeWorkRequest.Builder(AccountRemovalWorker::class.java).build()
         val capabilitiesUpdateWork = OneTimeWorkRequest.Builder(CapabilitiesSyncWorker::class.java).build()
         val signalingSettingsWork = OneTimeWorkRequest.Builder(SignalingSettingsWorker::class.java).build()
@@ -262,6 +272,8 @@ class NextcloudTalkApplication :
             ExistingPeriodicWorkPolicy.REPLACE,
             periodicCapabilitiesUpdateWork
         )
+
+        ConversationsSyncWorker.schedule(applicationContext)
     }
 
     override fun onTerminate() {

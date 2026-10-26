@@ -18,14 +18,11 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.AssetFileDescriptor
 import android.database.Cursor
-import android.location.LocationManager
-import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -33,7 +30,6 @@ import android.os.Handler
 import android.os.SystemClock
 import android.provider.ContactsContract
 import android.provider.MediaStore
-import android.provider.Settings
 import android.text.TextUtils
 import android.util.Log
 import android.view.View
@@ -70,7 +66,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
-import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.content.PermissionChecker
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
@@ -84,21 +79,16 @@ import androidx.fragment.app.commit
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
-import androidx.media3.common.Player
-import androidx.media3.session.MediaController
-import androidx.media3.session.SessionToken
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequest
+import com.nextcloud.talk.dagger.modules.assistedViewModels
 import com.nextcloud.talk.utils.setExpeditedIfSupported
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import autodagger.AutoInjector
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
-import com.google.common.util.concurrent.ListenableFuture
 import com.nextcloud.android.common.ui.color.ColorUtil
 import com.nextcloud.talk.BuildConfig
 import com.nextcloud.talk.R
@@ -109,7 +99,15 @@ import com.nextcloud.talk.api.NcApi
 import com.nextcloud.talk.api.NcApiCoroutines
 import com.nextcloud.talk.application.NextcloudTalkApplication
 import com.nextcloud.talk.attachmentpreview.FileAttachmentPreviewFragment
-import com.nextcloud.talk.chat.data.io.VoiceMessageMediaService
+import com.nextcloud.talk.chat.audio.ChatAudioError
+import com.nextcloud.talk.chat.audio.ChatAudioKey
+import com.nextcloud.talk.chat.audio.ChatAudioKind
+import com.nextcloud.talk.chat.audio.ChatAudioPlayer
+import com.nextcloud.talk.chat.audio.ChatAudioQueue
+import com.nextcloud.talk.chat.audio.ChatAudioSpeeds
+import com.nextcloud.talk.chat.audio.ChatAudioStore
+import com.nextcloud.talk.chat.audio.openMessageIntent
+import com.nextcloud.talk.chat.audio.toChatAudioTrack
 import com.nextcloud.talk.chat.data.model.ChatMessage
 import com.nextcloud.talk.chat.data.model.FileParameters
 import com.nextcloud.talk.chat.ui.ChatEmptyState
@@ -124,13 +122,11 @@ import com.nextcloud.talk.chat.ui.ShowReactionsModalBottomSheet
 import com.nextcloud.talk.chat.ui.TempMessageActionsBottomSheet
 import com.nextcloud.talk.chat.ui.TypingIndicatorBanner
 import com.nextcloud.talk.chat.ui.buildMessageActionsState
-import com.nextcloud.talk.chat.ui.model.MessageTypeContent
 import com.nextcloud.talk.chat.viewmodels.ChatViewModel
 import com.nextcloud.talk.chat.viewmodels.MessageInputViewModel
 import com.nextcloud.talk.conversationinfo.ConversationInfoActivity
 import com.nextcloud.talk.conversationinfo.viewmodel.ConversationInfoViewModel
 import com.nextcloud.talk.conversationlist.ConversationsListActivity
-import com.nextcloud.talk.dagger.modules.ViewModelFactoryWithParams
 import com.nextcloud.talk.data.database.model.SendStatus
 import com.nextcloud.talk.data.network.NetworkMonitor
 import com.nextcloud.talk.data.user.model.User
@@ -167,12 +163,16 @@ import com.nextcloud.talk.ui.OutOfOfficeViewData
 import com.nextcloud.talk.ui.PinnedMessageView
 import com.nextcloud.talk.ui.PlaybackSpeed
 import com.nextcloud.talk.ui.UpcomingEventView
+import com.nextcloud.talk.ui.chat.ChatAudioPlayerHost
+import com.nextcloud.talk.ui.chat.ChatAudioUi
 import com.nextcloud.talk.ui.chat.ChatMessageCallbacks
 import com.nextcloud.talk.ui.chat.ChatView
 import com.nextcloud.talk.ui.chat.ChatViewCallbacks
 import com.nextcloud.talk.ui.chat.ChatViewState
+import com.nextcloud.talk.ui.chat.LocalChatAudioUi
 import com.nextcloud.talk.ui.chat.LocalUploadProgressProvider
 import com.nextcloud.talk.ui.chat.LocalUploadedLocalPreviewProvider
+import com.nextcloud.talk.ui.chat.chatAudioPlayerCallbacks
 import com.nextcloud.talk.ui.dialog.DateTimeCompose
 import com.nextcloud.talk.ui.dialog.GetPinnedOptionsDialog
 import com.nextcloud.talk.ui.dialog.SaveToStorageDialogFragment
@@ -180,7 +180,6 @@ import com.nextcloud.talk.ui.theme.LocalMessageUtils
 import com.nextcloud.talk.ui.theme.LocalOpenGraphFetcher
 import com.nextcloud.talk.ui.theme.LocalViewThemeUtils
 import com.nextcloud.talk.utils.ApiUtils
-import com.nextcloud.talk.utils.AudioUtils
 import com.nextcloud.talk.utils.CapabilitiesUtil
 import com.nextcloud.talk.utils.CapabilitiesUtil.hasSpreedFeatureCapability
 import com.nextcloud.talk.utils.CapabilitiesUtil.retentionOfClassifiedRoom
@@ -214,6 +213,7 @@ import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_ROOM_TOKEN
 import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_START_CALL_AFTER_ROOM_SWITCH
 import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_SWITCH_TO_ROOM
 import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_THREAD_ID
+import com.nextcloud.talk.utils.keepContentOutOfDisplayCutout
 import com.nextcloud.talk.utils.permissions.PlatformPermissionUtil
 import com.nextcloud.talk.utils.rx.DisposableSet
 import com.nextcloud.talk.utils.singletons.ApplicationWideCurrentRoomHolder
@@ -226,7 +226,6 @@ import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -237,11 +236,10 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
 import java.io.File
@@ -256,7 +254,6 @@ import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ExecutionException
 import javax.inject.Inject
-import java.util.concurrent.CancellationException
 import kotlin.math.abs
 
 @Suppress("TooManyFunctions", "LargeClass", "LongMethod")
@@ -291,15 +288,26 @@ class ChatActivity :
     lateinit var networkMonitor: NetworkMonitor
 
     @Inject
+    lateinit var chatAudioStore: ChatAudioStore
+
+    @Inject
+    lateinit var chatAudioSpeeds: ChatAudioSpeeds
+
+    @Inject
     lateinit var chatViewModelFactory: ChatViewModel.ChatViewModelFactory
 
-    val chatViewModel: ChatViewModel by viewModels {
-        ViewModelFactoryWithParams(ChatViewModel::class.java) {
-            chatViewModelFactory.build(
-                roomToken,
-                conversationThreadId
-            )
-        }
+    /**
+     * The user of this chat as loaded in [onCreate], used to create [chatViewModel]. Afterwards use
+     * [conversationUser], which reflects later changes of the stored user.
+     */
+    private lateinit var initialUser: User
+
+    val chatViewModel: ChatViewModel by assistedViewModels {
+        chatViewModelFactory.build(
+            initialUser,
+            roomToken,
+            conversationThreadId
+        )
     }
 
     lateinit var conversationInfoViewModel: ConversationInfoViewModel
@@ -314,8 +322,17 @@ class ChatActivity :
         mutableStateOf<ChatViewModel.UpcomingEventUIState>(ChatViewModel.UpcomingEventUIState.None)
     private val overflowContainerHeightPx = mutableIntStateOf(0)
 
-    private var mediaControllerFuture: ListenableFuture<MediaController>? = null
-    private var mediaController: MediaController? = null
+    private lateinit var chatAudioPlayer: ChatAudioPlayer
+    private val voiceMessageSpeed = MutableStateFlow(PlaybackSpeed.NORMAL)
+    private val chatAudioUi by lazy {
+        ChatAudioUi(
+            playbackState = chatAudioPlayer.state,
+            metadata = chatAudioStore.metadata,
+            voiceSpeed = voiceMessageSpeed,
+            internalUserId = { if (::initialUser.isInitialized) conversationUser.id else null },
+            loadMetadata = { chatAudioStore.load(it) }
+        )
+    }
 
     private val startSelectContactForResult = registerForActivityResult(
         ActivityResultContracts
@@ -362,6 +379,8 @@ class ChatActivity :
             ?: error("roomToken missing")
     }
 
+    val conversationUserId: Long by lazy { resolveUserIdFromIntent() }
+
     val conversationThreadId: Long? by lazy {
         if (intent.hasExtra(KEY_THREAD_ID)) {
             intent.getLongExtra(KEY_THREAD_ID, 0L)
@@ -372,7 +391,8 @@ class ChatActivity :
 
     var openedViaNotification: Boolean = false
     var conversationThreadInfo: ThreadInfoDto? = null
-    lateinit var conversationUser: User
+    val conversationUser: User
+        get() = chatViewModel.currentUser
     lateinit var spreedCapabilities: SpreedCapabilityDto
     var chatApiVersion: Int = 1
     private var roomPassword: String = ""
@@ -392,6 +412,9 @@ class ChatActivity :
 
     var myFirstMessage: CharSequence? = null
     private var isLeavingRoom: Boolean = false
+    private var isScreenResumed: Boolean = false
+    private var hasBeenPaused: Boolean = false
+    private var isInitialLoadDone: Boolean = false
 
     private var lastHandledHighlightNonce: Long? = null
     private var pendingHighlightedMessageId: Long? = null
@@ -421,76 +444,6 @@ class ChatActivity :
 
     private lateinit var pickMultipleMedia: ActivityResultLauncher<PickVisualMediaRequest>
 
-    private var progressJob: Job? = null
-
-    private fun updateSeekbarUi() {
-        mediaController?.let { controller ->
-            val currentPosition = controller.currentPosition
-            val duration = controller.duration.takeIf { it > 0 } ?: 1
-
-            val progress = (currentPosition.toFloat() / duration) * FLOAT_100
-            val secondsPlayed = (currentPosition / MILLIS_1000)
-
-            val msg = chatViewModel.currentVoiceMessage?.apply {
-                voiceMessageSeekbarProgress = kotlin.math.ceil(progress).toInt()
-                voiceMessagePlayedSeconds = secondsPlayed.toInt()
-                if (controller.duration > 0) {
-                    voiceMessageDuration = (controller.duration / MILLIS_1000).toInt()
-                }
-            }
-
-            val currentMediaId = controller.currentMediaItem?.mediaId
-            if (currentMediaId != null && msg != null) {
-                chatViewModel.syncVoiceMessageUiState(msg)
-            }
-        }
-    }
-
-    private fun startProgressPolling() {
-        progressJob?.cancel()
-        progressJob = lifecycleScope.launch {
-            while (isActive) {
-                updateSeekbarUi()
-                // Poll every 150ms for smooth seekbar updates
-                delay(MILLIS_150)
-            }
-        }
-    }
-
-    private fun stopProgressPolling() {
-        progressJob?.cancel()
-        progressJob = null
-    }
-
-    private val playerListener = object : Player.Listener {
-        override fun onIsPlayingChanged(isPlaying: Boolean) {
-            if (isPlaying) {
-                startProgressPolling()
-            } else {
-                stopProgressPolling()
-                updateSeekbarUi()
-            }
-
-            chatViewModel.currentVoiceMessage?.apply {
-                isPlayingVoiceMessage = isPlaying
-            }?.let { chatViewModel.syncVoiceMessageUiState(it) }
-        }
-
-        // Catches instant changes (e.g., manual seeks, skipping to the next track)
-        override fun onPositionDiscontinuity(
-            oldPosition: Player.PositionInfo,
-            newPosition: Player.PositionInfo,
-            reason: Int
-        ) {
-            updateSeekbarUi()
-        }
-
-        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            // Ensures the UI resets immediately when transitioning to the next voice message
-            updateSeekbarUi()
-        }
-    }
-
     private val onBackPressedCallback = object : OnBackPressedCallback(true) {
         override fun handleOnBackPressed() {
             if (chatViewModel.chatMode.value == ChatViewModel.ChatMode.SEARCH_MODE) {
@@ -504,6 +457,7 @@ class ChatActivity :
                 onBackPressedDispatcher.onBackPressed()
             } else {
                 val intent = Intent(this@ChatActivity, ConversationsListActivity::class.java)
+                intent.putExtra(KEY_INTERNAL_USER_ID, conversationUserId)
                 intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 startActivity(intent)
                 finish()
@@ -520,13 +474,11 @@ class ChatActivity :
             is ChatViewModel.LeaveRoomSuccessState -> {
                 logConversationInfos("leaveRoom#onNext")
 
-                isLeavingRoom = false
-
-                if (getRoomInfoTimerHandler != null) {
+                // a return to the chat during the leave resets isLeavingRoom and starts the room timer again
+                if (isLeavingRoom) {
                     getRoomInfoTimerHandler?.removeCallbacksAndMessages(null)
                 }
-
-                ApplicationWideCurrentRoomHolder.getInstance().clear()
+                isLeavingRoom = false
             }
 
             else -> {}
@@ -591,9 +543,16 @@ class ChatActivity :
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         NextcloudTalkApplication.sharedApplication!!.componentApplication.inject(this)
+        // Not loaded in a coroutine: initData() must have run before onResume() (activity and ChatViewModel),
+        // and registerForActivityResult() must be called before the activity is started.
+        initialUser = setUpBoundUserOrFinish() ?: return
+
+        chatAudioPlayer = ChatAudioPlayer(this, chatAudioStore, lifecycleScope)
+        lifecycle.addObserver(chatAudioPlayer)
 
         binding = ActivityChatBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        keepContentOutOfDisplayCutout()
 
         setupChatToolbarView()
         setupChatEmptyStateView()
@@ -629,67 +588,61 @@ class ChatActivity :
 
         setPinnedMessageContent()
 
+        setAudioPlayerBarContent()
+
         setUpcomingEventContent()
 
         binding.chatOverflowContainer.viewTreeObserver.addOnGlobalLayoutListener {
             overflowContainerHeightPx.intValue = binding.chatOverflowContainer.height
         }
 
-        lifecycleScope.launch {
-            currentUserProvider.getCurrentUser()
-                .onSuccess { user ->
-                    conversationUser = user
-                    handleIntent(intent)
-                    val urlForChatting = ApiUtils.getUrlForChat(chatApiVersion, conversationUser?.baseUrl, roomToken)
-                    val credentials = ApiUtils.getCredentials(conversationUser!!.username, conversationUser!!.token)
+        initialUser.userId?.let {
+            voiceMessageSpeed.value = chatAudioSpeeds.speedFor(it, ChatAudioKind.VOICE_MESSAGE)
+            chatAudioSpeeds.speedFlow(it, ChatAudioKind.VOICE_MESSAGE)
+                .onEach { speed -> voiceMessageSpeed.value = speed }
+                .launchIn(lifecycleScope)
+        }
+        handleIntent(intent)
+        chatViewModel.initData()
+        if (sharedText.isNotEmpty()) {
+            chatViewModel.messageDraft.messageText = sharedText
+            chatViewModel.saveMessageDraft()
+        }
 
-                    chatViewModel.initData(
-                        user,
-                        credentials!!,
-                        urlForChatting,
-                        conversationThreadId
-                    )
+        conversationThreadId?.let {
+            val threadUrl = ApiUtils.getUrlForThread(
+                version = 1,
+                baseUrl = conversationUser.baseUrl,
+                token = roomToken,
+                threadId = it.toInt()
+            )
+            chatViewModel.getThread(conversationUser.getCredentials(), threadUrl)
+        }
 
-                    conversationThreadId?.let {
-                        val threadUrl = ApiUtils.getUrlForThread(
-                            version = 1,
-                            baseUrl = conversationUser!!.baseUrl,
-                            token = roomToken,
-                            threadId = it.toInt()
-                        )
-                        chatViewModel.getThread(credentials, threadUrl)
-                    }
+        messageInputFragment = getMessageInputFragment()
+        messageInputViewModel.setData(chatViewModel.getChatRepository())
 
-                    messageInputFragment = getMessageInputFragment()
-                    messageInputViewModel.setData(chatViewModel.getChatRepository())
+        initObservers()
 
-                    initObservers()
+        pendingTargetMessageId?.let { messageId ->
+            lifecycleScope.launch {
+                chatViewModel.openMessageFromGlobalSearch(
+                    messageId = messageId,
+                    threadId = pendingTargetThreadId,
+                    searchQuery = pendingTargetSearchQuery
+                )
+            }
+            pendingTargetMessageId = null
+            pendingTargetThreadId = null
+            pendingTargetSearchQuery = null
+        }
 
-                    pendingTargetMessageId?.let { messageId ->
-                        lifecycleScope.launch {
-                            chatViewModel.openMessageFromGlobalSearch(
-                                messageId = messageId,
-                                threadId = pendingTargetThreadId,
-                                searchQuery = pendingTargetSearchQuery
-                            )
-                        }
-                        pendingTargetMessageId = null
-                        pendingTargetThreadId = null
-                        pendingTargetSearchQuery = null
-                    }
-
-                    pickMultipleMedia = registerForActivityResult(
-                        ActivityResultContracts.PickMultipleVisualMedia(MAX_AMOUNT_MEDIA_FILE_PICKER)
-                    ) { uris ->
-                        if (uris.isNotEmpty()) {
-                            onChooseFileResult(uris)
-                        }
-                    }
-                }
-                .onFailure {
-                    logger.e(TAG, "Failed to register media picker activity result launcher", it)
-                    Snackbar.make(binding.root, R.string.nc_common_error_sorry, Snackbar.LENGTH_LONG).show()
-                }
+        pickMultipleMedia = registerForActivityResult(
+            ActivityResultContracts.PickMultipleVisualMedia(MAX_AMOUNT_MEDIA_FILE_PICKER)
+        ) { uris ->
+            if (uris.isNotEmpty()) {
+                onChooseFileResult(uris)
+            }
         }
 
         onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
@@ -768,9 +721,7 @@ class ChatActivity :
 
     private fun scrollToMessageById(messageId: Long, logMiss: Boolean = true): Boolean {
         val items = chatViewModel.uiState.value.items
-        val targetIndex = items.indexOfFirst { item ->
-            (item as? ChatViewModel.ChatItem.MessageItem)?.uiMessage?.id == messageId.toInt()
-        }
+        val targetIndex = items.indexOfFirst { it.containsMessage(messageId.toInt()) }
         val listState = chatListState
         val composeScope = chatListComposeScope
         val isReadyToScroll = targetIndex >= 0 && listState != null && composeScope != null
@@ -837,9 +788,7 @@ class ChatActivity :
 
             if (attempt < SEARCH_CENTER_STABILIZE_ATTEMPTS - 1) {
                 delay(SEARCH_CENTER_STABILIZE_DELAY_MS)
-                targetIndex = chatViewModel.uiState.value.items.indexOfFirst { item ->
-                    (item as? ChatViewModel.ChatItem.MessageItem)?.uiMessage?.id == messageId.toInt()
-                }
+                targetIndex = chatViewModel.uiState.value.items.indexOfFirst { it.containsMessage(messageId.toInt()) }
             }
         }
     }
@@ -910,7 +859,8 @@ class ChatActivity :
                     LocalMessageUtils provides messageUtils,
                     LocalOpenGraphFetcher provides { url -> chatViewModel.fetchOpenGraph(url) },
                     LocalUploadProgressProvider provides { refId -> uploadProgressMap[refId] },
-                    LocalUploadedLocalPreviewProvider provides { refId -> uploadedLocalPreviewMap[refId] }
+                    LocalUploadedLocalPreviewProvider provides { refId -> uploadedLocalPreviewMap[refId] },
+                    LocalChatAudioUi provides chatAudioUi
                 ) {
                     val isOneToOneConversation = uiState.isOneToOneConversation
 
@@ -953,16 +903,9 @@ class ChatActivity :
                                 onSwipeReply = { handleSwipeToReply(it) },
                                 onFileClick = { downloadAndOpenFile(it, openWhenDownloadState, downloadingFileState) },
                                 onPollClick = { pollId, pollName -> openPollDialog(pollId, pollName) },
-                                onVoicePlayPauseClick = { onVoiceClick(it) },
-                                onVoiceSeek = { id, progress ->
-                                    mediaController?.let { controller ->
-                                        if (id.toString() == controller.currentMediaItem?.mediaId) {
-                                            val pos = controller.duration * progress / 100f
-                                            controller.seekTo(pos.toLong())
-                                        }
-                                    }
-                                },
-                                onVoiceSpeedClick = { onVoiceSpeedClickCompose(it) },
+                                onVoicePlayPauseClick = { onAudioMessageClick(it) },
+                                onVoiceSeek = { messageId, progress -> onAudioMessageSeek(messageId, progress) },
+                                onVoiceSpeedClick = { onVoiceMessageSpeedClick() },
                                 onReactionClick = { messageId, emoji -> handleReactionClick(messageId, emoji) },
                                 onReactionLongClick = { messageId -> openReactionsDialog(messageId) },
                                 onOpenThreadClick = { messageId -> openThread(messageId.toLong()) },
@@ -982,19 +925,15 @@ class ChatActivity :
                     value = reactionsSheetMessageId?.let { id -> chatViewModel.getMessageById(id).first() }
                 }
                 reactionsSheetMessage?.let { msg ->
-                    if (::conversationUser.isInitialized) {
-                        conversationUser.let { user ->
-                            ShowReactionsModalBottomSheet(
-                                chatMessage = msg,
-                                user = user,
-                                roomToken = roomToken,
-                                hasReactPermission = participantPermissions?.hasReactPermission() == true,
-                                ncApiCoroutines = ncApiCoroutines,
-                                onDeleteReaction = { emoji -> chatViewModel.deleteReaction(roomToken, msg, emoji) },
-                                onDismiss = { chatViewModel.dismissReactionsSheet() }
-                            )
-                        }
-                    }
+                    ShowReactionsModalBottomSheet(
+                        chatMessage = msg,
+                        user = conversationUser,
+                        roomToken = roomToken,
+                        hasReactPermission = participantPermissions?.hasReactPermission() == true,
+                        ncApiCoroutines = ncApiCoroutines,
+                        onDeleteReaction = { emoji -> chatViewModel.deleteReaction(roomToken, msg, emoji) },
+                        onDismiss = { chatViewModel.dismissReactionsSheet() }
+                    )
                 }
 
                 val profileSheetMessageId by chatViewModel.profileSheetMessageId.collectAsStateWithLifecycle()
@@ -1005,17 +944,13 @@ class ChatActivity :
                     ?.takeIf { it.actorType.equals("users") }
                     ?.let { msg ->
                         val actorId = msg.actorId ?: return@let
-                        if (::conversationUser.isInitialized) {
-                            conversationUser.let { user ->
-                                ProfileModalBottomSheet(
-                                    actorId = actorId,
-                                    user = user,
-                                    ncApiCoroutines = ncApiCoroutines,
-                                    onTalkTo = { actorId -> startDirectChat(actorId) },
-                                    onDismiss = { chatViewModel.dismissProfileSheet() }
-                                )
-                            }
-                        }
+                        ProfileModalBottomSheet(
+                            actorId = actorId,
+                            user = conversationUser,
+                            ncApiCoroutines = ncApiCoroutines,
+                            onTalkTo = { actorId -> startDirectChat(actorId) },
+                            onDismiss = { chatViewModel.dismissProfileSheet() }
+                        )
                     }
 
                 val messageActionsMessageId by chatViewModel.messageActionsMessageId.collectAsStateWithLifecycle()
@@ -1039,199 +974,147 @@ class ChatActivity :
                             onDismiss = { chatViewModel.dismissMessageActions() }
                         )
                     } else {
-                        if (::conversationUser.isInitialized) {
-                            conversationUser.let { user ->
-                                MessageActionsBottomSheet(
-                                    actionsState = buildMessageActionsState(
-                                        message = msg,
-                                        user = user,
-                                        conversation = currentConversation,
-                                        hasChatPermission = participantPermissions?.hasChatPermission() == true,
-                                        hasReactPermission = participantPermissions?.hasReactPermission() == true,
-                                        spreedCapabilities = spreedCapabilities,
-                                        isOnline = isOnline,
-                                        dateUtils = dateUtils,
-                                        conversationThreadId = conversationThreadId
-                                    ),
-                                    onEmojiClick = { emoji ->
-                                        if (msg.reactionsSelf?.contains(emoji) == true) {
-                                            chatViewModel.deleteReaction(roomToken, msg, emoji)
-                                        } else {
-                                            chatViewModel.addReaction(roomToken, msg, emoji)
-                                        }
-                                    },
-                                    onReply = {
-                                        if (msg.isThread && conversationThreadId == null) {
-                                            openThread(msg)
-                                        } else {
-                                            messageInputViewModel.reply(msg)
-                                        }
-                                    },
-                                    onReplyPrivately = { replyPrivately(msg) },
-                                    onOpenThread = { msg.threadId?.let { openThread(it) } },
-                                    onForward = { forwardMessage(msg) },
-                                    onEdit = { messageInputViewModel.edit(msg) },
-                                    onCopy = { copyMessage(msg) },
-                                    onCopyMessageLink = { copyMessageLink(msg) },
-                                    onMarkAsUnread = { markAsUnread(msg) },
-                                    onRemind = { remindMeLater(msg) },
-                                    onPin = { pinMessage(msg) },
-                                    onUnpin = { unPinMessage(msg) },
-                                    onTranslate = { translateMessage(msg) },
-                                    onShareToNote = { shareToNotes(msg) },
-                                    onShare = {
-                                        if (msg.getCalculateMessageType() ==
-                                            ChatMessage.MessageType.SINGLE_NC_ATTACHMENT_MESSAGE
-                                        ) {
-                                            checkIfSharable(msg)
-                                        } else {
-                                            msg.message?.let { shareMessageText(it) }
-                                        }
-                                    },
-                                    onSave = { checkIfSaveable(msg) },
-                                    onOpenInFiles = { openInFilesApp(msg) },
-                                    onDelete = { deleteMessage(msg) },
-                                    onDismiss = { chatViewModel.dismissMessageActions() }
-                                )
-                            }
-                        }
+                        MessageActionsBottomSheet(
+                            actionsState = buildMessageActionsState(
+                                message = msg,
+                                user = conversationUser,
+                                conversation = currentConversation,
+                                hasChatPermission = participantPermissions?.hasChatPermission() == true,
+                                hasReactPermission = participantPermissions?.hasReactPermission() == true,
+                                spreedCapabilities = spreedCapabilities,
+                                isOnline = isOnline,
+                                dateUtils = dateUtils,
+                                conversationThreadId = conversationThreadId
+                            ),
+                            onEmojiClick = { emoji ->
+                                if (msg.reactionsSelf?.contains(emoji) == true) {
+                                    chatViewModel.deleteReaction(roomToken, msg, emoji)
+                                } else {
+                                    chatViewModel.addReaction(roomToken, msg, emoji)
+                                }
+                            },
+                            onReply = {
+                                if (msg.isThread && conversationThreadId == null) {
+                                    openThread(msg)
+                                } else {
+                                    messageInputViewModel.reply(msg)
+                                }
+                            },
+                            onReplyPrivately = { replyPrivately(msg) },
+                            onOpenThread = { msg.threadId?.let { openThread(it) } },
+                            onForward = { forwardMessage(msg) },
+                            onEdit = { messageInputViewModel.edit(msg) },
+                            onCopy = { copyMessage(msg) },
+                            onCopyMessageLink = { copyMessageLink(msg) },
+                            onMarkAsUnread = { markAsUnread(msg) },
+                            onRemind = { remindMeLater(msg) },
+                            onPin = { pinMessage(msg) },
+                            onUnpin = { unPinMessage(msg) },
+                            onTranslate = { translateMessage(msg) },
+                            onShareToNote = { shareToNotes(msg) },
+                            onShare = {
+                                if (msg.getCalculateMessageType() ==
+                                    ChatMessage.MessageType.SINGLE_NC_ATTACHMENT_MESSAGE
+                                ) {
+                                    checkIfSharable(msg)
+                                } else {
+                                    msg.message?.let { shareMessageText(it) }
+                                }
+                            },
+                            onSave = { checkIfSaveable(msg) },
+                            onOpenInFiles = { openInFilesApp(msg) },
+                            onDelete = { deleteMessage(msg) },
+                            onDismiss = { chatViewModel.dismissMessageActions() }
+                        )
                     }
                 }
             }
         }
     }
 
-    @Suppress("ReturnCount", "CyclomaticComplexMethod")
-    private fun onVoiceClick(messageId: Int) {
-        fun getAudioDuration(audioFilePath: String): Long {
-            val retriever = MediaMetadataRetriever()
+    private fun onAudioMessageClick(messageId: Int) {
+        if (!::initialUser.isInitialized) {
+            return
+        }
+        val voiceMessageLabel = getString(R.string.nc_voice_message)
+        val tracks = chatViewModel.uiState.value.items
+            .asReversed()
+            .mapNotNull { (it as? ChatViewModel.ChatItem.MessageItem)?.uiMessage }
+            .mapNotNull { it.toChatAudioTrack(conversationUser, voiceMessageLabel, openThreadId()) }
+        val queue = ChatAudioQueue.build(tracks, messageId, { it.key.messageId }, { it.kind })
+        if (queue == null) {
+            showAudioError(ChatAudioError.UNAVAILABLE)
+        } else {
+            val speed = speedFor(queue.items[queue.startIndex].kind)
+            chatAudioPlayer.playOrPause(queue.items, queue.startIndex, speed.value)
+        }
+    }
 
-            return try {
-                retriever.setDataSource(audioFilePath)
-                val durationString = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                val durationLong = durationString?.toLong() ?: 0L
-
-                durationLong / ONE_SECOND_IN_MILLIS
-            } catch (e: IllegalArgumentException) {
-                logger.e(TAG, "Failed to read audio duration for $audioFilePath", e)
-                0L
-            } finally {
-                retriever.release()
-            }
+    private fun speedFor(kind: ChatAudioKind): PlaybackSpeed =
+        if (kind == ChatAudioKind.VOICE_MESSAGE) {
+            voiceMessageSpeed.value
+        } else {
+            conversationUser.userId?.let { chatAudioSpeeds.speedFor(it, kind) } ?: PlaybackSpeed.NORMAL
         }
 
-        fun setupAndPlay(controller: MediaController, message: ChatMessage, file: String) {
-            val avatarUrl = chatViewModel.getAvatarUrl(message)
+    private fun onAudioMessageSeek(messageId: Int, progress: Float) {
+        val internalUserId = if (::initialUser.isInitialized) conversationUser.id else null
+        internalUserId?.let { chatAudioPlayer.seekTo(ChatAudioKey(it, roomToken, messageId), progress) }
+    }
 
-            val artist = if (message.isVoiceMessage) {
-                "Voice Message"
-            } else {
-                message.fileParameters.name
-            }
-            val metadata = MediaMetadata.Builder()
-                .setTitle(message.actorDisplayName)
-                .setArtist(artist)
-                .setArtworkUri(avatarUrl.toUri())
-                .build()
-
-            val mediaItem = MediaItem.Builder()
-                .setMediaId(message.jsonMessageId.toString())
-                .setMediaMetadata(metadata)
-                .setUri(file)
-                .build()
-
-            controller.setMediaItem(mediaItem)
-
-            controller.prepare()
-            controller.play()
+    private fun onVoiceMessageSpeedClick() {
+        val nextSpeed = voiceMessageSpeed.value.next()
+        voiceMessageSpeed.value = nextSpeed
+        if (::initialUser.isInitialized) {
+            conversationUser.userId?.let { chatAudioSpeeds.save(it, ChatAudioKind.VOICE_MESSAGE, nextSpeed) }
+            conversationUser.id?.let { chatAudioPlayer.setSpeed(it, ChatAudioKind.VOICE_MESSAGE, nextSpeed.value) }
         }
+    }
 
-        fun setUpWaveform(message: ChatMessage, file: File) {
-            if (message.voiceMessageFloatArray != null) return
-
-            val filename = message.fileParameters.name
-            message.isDownloadingVoiceMessage = true
-
-            chatViewModel.syncVoiceMessageUiState(message)
-
-            CoroutineScope(Dispatchers.Default).launch {
-                val waveform = AudioUtils.audioFileToFloatArray(file)
-                appPreferences.saveWaveFormForFile(filename, waveform.toTypedArray())
-                message.voiceMessageFloatArray = waveform
-
-                withContext(Dispatchers.Main) {
-                    message.isDownloadingVoiceMessage = false
-                    chatViewModel.syncVoiceMessageUiState(message)
-                }
-            }
+    private fun openAudioMessage(key: ChatAudioKey, threadId: Long?) {
+        val isThisView = key.roomToken == roomToken &&
+            threadId == openThreadId() &&
+            ::initialUser.isInitialized &&
+            key.internalUserId == conversationUser.id
+        if (isThisView) {
+            chatViewModel.jumpToQuotedMessage(key.messageId.toLong())
+        } else {
+            startActivity(key.openMessageIntent(this, threadId))
         }
+    }
 
-        fun prepareVoiceMessage(controller: MediaController, message: ChatMessage): Boolean {
-            val currentMessageId = message.jsonMessageId.toString()
-            val filename = message.fileParameters.name
-            if (filename.isEmpty()) {
-                return true
-            }
+    /** The thread this chat shows, or null if it shows the conversation itself. */
+    private fun openThreadId(): Long? = conversationThreadId?.takeIf { it > 0L }
 
-            val file = FileUtils.resolveSharedAttachmentFile(context.cacheDir, filename) ?: return true
-            val fileURI = file.toUri()
-            val filePath = fileURI.toString()
-
-            chatViewModel.syncVoiceMessageUiState(
-                message.apply {
-                    voiceMessageDuration = getAudioDuration(file.absolutePath).toInt()
-                }
-            )
-
-            fun finishPreparing() {
-                setupAndPlay(controller, message, filePath)
-                if (message.isVoiceMessage) {
-                    setUpWaveform(message, file)
-                } else {
-                    message.isDownloadingVoiceMessage = false
-                    chatViewModel.syncVoiceMessageUiState(message)
-                }
-            }
-
-            val alreadyLoaded = controller.currentMediaItem?.mediaId == currentMessageId
-            if (!alreadyLoaded || !file.exists()) {
-                if (!file.exists()) {
-                    downloadFileToCache(message, true) {
-                        chatViewModel.syncVoiceMessageUiState(
-                            message.apply {
-                                voiceMessageDuration = getAudioDuration(file.absolutePath).toInt()
-                            }
-                        )
-                        finishPreparing()
-                    }
-                } else {
-                    finishPreparing()
-                }
-
-                return true
-            }
-            return false
+    private fun showAudioError(error: ChatAudioError) {
+        val message = when (error) {
+            ChatAudioError.NETWORK -> R.string.nc_audio_error_network
+            ChatAudioError.UNAVAILABLE -> R.string.nc_audio_error_unavailable
+            ChatAudioError.UNSUPPORTED -> R.string.nc_audio_error_unsupported
+            ChatAudioError.UNKNOWN -> R.string.nc_audio_error_generic
         }
+        Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
+    }
 
-        lifecycleScope.launch {
-            val message = chatViewModel.getMessageById(messageId.toLong()).first()
-
-            mediaController?.let { controller ->
-                // If a message is still playing, it must be paused first before another can be loaded
-                val currentMessageId = message.jsonMessageId.toString()
-                if (controller.isPlaying && controller.currentMediaItem?.mediaId != currentMessageId) return@launch
-
-                chatViewModel.currentVoiceMessage = message
-
-                // If the controller is playing a new voice message, initialize
-                if (prepareVoiceMessage(controller, message)) return@launch
-
-                // If the controller is playing the same voice message, pause/resume
-                if (controller.isPlaying) {
-                    controller.pause()
-                } else {
-                    controller.play()
+    private fun setAudioPlayerBarContent() {
+        val callbacks = chatAudioPlayerCallbacks(
+            player = chatAudioPlayer,
+            speeds = chatAudioSpeeds,
+            scope = lifecycleScope,
+            onOpenMessage = { key, threadId -> openAudioMessage(key, threadId) },
+            onSpeedChanged = { key, kind, speed ->
+                val isOwnVoiceMessage = kind == ChatAudioKind.VOICE_MESSAGE &&
+                    ::initialUser.isInitialized &&
+                    key.internalUserId == conversationUser.id
+                if (isOwnVoiceMessage) {
+                    voiceMessageSpeed.value = speed
                 }
+            }
+        )
+        binding.audioPlayerBarComposeView.setContent {
+            MaterialTheme(colorScheme = viewThemeUtils.getColorScheme(this@ChatActivity)) {
+                val state by chatAudioPlayer.state.collectAsStateWithLifecycle()
+                ChatAudioPlayerHost(state = state, callbacks = callbacks)
             }
         }
     }
@@ -1272,7 +1155,6 @@ class ChatActivity :
     private fun startDirectChat(actorId: String) {
         lifecycleScope.launch {
             try {
-                if (!::conversationUser.isInitialized) return@launch
                 val user = conversationUser
                 val apiVersion = ApiUtils.getConversationApiVersion(user, intArrayOf(ApiUtils.API_V4, 1))
                 val retrofitBucket = ApiUtils.getRetrofitBucketForCreateRoom(
@@ -1286,10 +1168,7 @@ class ChatActivity :
                     retrofitBucket.url,
                     retrofitBucket.queryMap
                 )
-                val bundle = Bundle()
-                bundle.putString(KEY_ROOM_TOKEN, roomOverall.ocs!!.data!!.token)
-                val chatIntent = Intent(this@ChatActivity, ChatActivity::class.java)
-                chatIntent.putExtras(bundle)
+                val chatIntent = createIntent(this@ChatActivity, user.id!!, roomOverall.ocs!!.data!!.token)
                 chatIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 startActivity(chatIntent)
             } catch (e: Exception) {
@@ -1297,19 +1176,6 @@ class ChatActivity :
                 Snackbar.make(binding.root, R.string.nc_common_error_sorry, Snackbar.LENGTH_LONG).show()
             }
         }
-    }
-
-    private fun onVoiceSpeedClickCompose(messageId: Int) {
-        val currentSpeed = chatViewModel.uiState.value.items
-            .mapNotNull { (it as? ChatViewModel.ChatItem.MessageItem)?.uiMessage }
-            .firstOrNull { it.id == messageId }
-            ?.content
-            ?.let { it as? MessageTypeContent.Voice }
-            ?.playbackSpeed ?: PlaybackSpeed.NORMAL
-        val nextSpeed = currentSpeed.next()
-        chatViewModel.setPlayBack(nextSpeed)
-        appPreferences.savePreferredPlayback(conversationUser!!.userId, nextSpeed)
-        chatViewModel.setVoiceMessageSpeed(messageId, nextSpeed)
     }
 
     fun downloadAndOpenFile(
@@ -1332,7 +1198,13 @@ class ChatActivity :
 
             if (isViewableMedia && seedItems.any { it.messageId == messageId.toLong() }) {
                 startActivity(
-                    MediaViewerActivity.newIntent(this@ChatActivity, roomToken, seedItems, messageId.toLong())
+                    MediaViewerActivity.newIntent(
+                        this@ChatActivity,
+                        conversationUserId,
+                        roomToken,
+                        seedItems,
+                        messageId.toLong()
+                    )
                 )
             } else {
                 fileViewerUtils.openFile(chatMessage, openWhenDownloadState, downloadState)
@@ -1370,6 +1242,14 @@ class ChatActivity :
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        val newUserId = intent.getLongExtra(KEY_INTERNAL_USER_ID, conversationUserId)
+        if (newUserId != conversationUserId) {
+            // A chat instance is bound to one account, so open a fresh instance for the other one.
+            intent.removeFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            finish()
+            startActivity(intent)
+            return
+        }
         val extras: Bundle? = intent.extras
 
         val requestedRoomSwitch = extras?.getBoolean(KEY_SWITCH_TO_ROOM, false) == true
@@ -1426,56 +1306,20 @@ class ChatActivity :
     override fun onStart() {
         super.onStart()
         active = true
-        this.lifecycle.addObserver(AudioUtils)
         this.lifecycle.addObserver(chatViewModel)
-
-        val sessionToken = SessionToken(this, ComponentName(this, VoiceMessageMediaService::class.java))
-        val future = MediaController.Builder(this, sessionToken)
-            .setListener(object : MediaController.Listener {
-                override fun onDisconnected(controller: MediaController) {
-                    mediaController?.removeListener(playerListener)
-                    stopProgressPolling()
-                    mediaController = null
-                }
-            })
-            .buildAsync()
-        mediaControllerFuture = future
-
-        future.addListener({
-            if (future !== mediaControllerFuture) {
-                return@addListener
-            }
-
-            mediaController = try {
-                future.get()
-            } catch (_: CancellationException) {
-                null
-            }
-
-            mediaController?.addListener(playerListener)
-
-            if (mediaController?.isPlaying == true) {
-                startProgressPolling()
-            }
-        }, ContextCompat.getMainExecutor(this))
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        chatViewModel.handleOrientationChange()
+        if (isChangingConfigurations) {
+            chatViewModel.handleOrientationChange()
+        }
         super.onSaveInstanceState(outState)
     }
 
     override fun onStop() {
         super.onStop()
         active = false
-        this.lifecycle.removeObserver(AudioUtils)
         this.lifecycle.removeObserver(chatViewModel)
-
-        mediaController?.removeListener(playerListener)
-        stopProgressPolling()
-
-        mediaControllerFuture?.let { MediaController.releaseFuture(it) }
-        mediaController = null
     }
 
     @OptIn(FlowPreview::class)
@@ -1536,6 +1380,12 @@ class ChatActivity :
                     ChatViewModel.ReactionOperation.ADD -> R.string.reaction_add_failed
                     ChatViewModel.ReactionOperation.DELETE -> R.string.reaction_delete_failed
                 }
+                Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
+            }
+        }
+
+        lifecycleScope.launch {
+            chatViewModel.actionFailures.collect { message ->
                 Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
             }
         }
@@ -1602,6 +1452,7 @@ class ChatActivity :
                 }
 
                 is ChatViewModel.GetCapabilitiesInitialLoadState -> {
+                    isInitialLoadDone = true
                     spreedCapabilities = state.spreedCapabilities
                     currentConversation = state.conversationModel
                     chatApiVersion = ApiUtils.getChatApiVersion(spreedCapabilities, intArrayOf(1))
@@ -1617,39 +1468,14 @@ class ChatActivity :
                         }
                     }
 
-                    joinRoomWithPassword()
-
-                    if (sharedFilePaths.isNotEmpty()) {
-                        onChooseFileResult(sharedFilePaths.map { it.toUri() })
-                        sharedFilePaths = emptyList()
+                    if (isScreenResumed) {
+                        ensureJoined()
                     }
 
-                    refreshScheduledMessages()
+                    sendSharedFiles()
 
                     updateToolbarState()
-                    if (state.conversationModel.type == ConversationEnums.ConversationType.ROOM_TYPE_ONE_TO_ONE_CALL &&
-                        state.conversationModel.status == "dnd"
-                    ) {
-                        conversationUser.let { user ->
-                            val credentials = ApiUtils.getCredentials(user.username, user.token)
-                            chatViewModel.outOfOfficeStatusOfUser(
-                                credentials!!,
-                                user.baseUrl!!,
-                                state.conversationModel!!.name
-                            )
-                        }
-                    }
-
-                    if (::conversationUser.isInitialized) {
-                        conversationUser.let { user ->
-                            val credentials = ApiUtils.getCredentials(user.username, user.token)
-                            chatViewModel.fetchUpcomingEvent(
-                                credentials!!,
-                                user.baseUrl!!,
-                                roomToken
-                            )
-                        }
-                    }
+                    refreshConversationExtras(state.conversationModel)
 
                     if (state.conversationModel.objectType == ConversationEnums.ObjectType.EVENT &&
                         hasSpreedFeatureCapability(
@@ -1820,12 +1646,10 @@ class ChatActivity :
         chatViewModel.createRoomViewState.observe(this) { state ->
             when (state) {
                 is ChatViewModel.CreateRoomSuccessState -> {
-                    val bundle = Bundle()
-                    bundle.putString(KEY_ROOM_TOKEN, state.roomOverall.ocs!!.data!!.token)
+                    val token = state.roomOverall.ocs!!.data!!.token
 
                     leaveRoom {
-                        val chatIntent = Intent(context, ChatActivity::class.java)
-                        chatIntent.putExtras(bundle)
+                        val chatIntent = createIntent(context, conversationUserId, token)
                         chatIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
                         startActivity(chatIntent)
                     }
@@ -1840,10 +1664,11 @@ class ChatActivity :
             }
         }
 
-        this.lifecycleScope.launch {
-            chatViewModel.mediaPlayerSeekbarObserver.onEach { msg ->
-            }.collect()
-        }
+        chatAudioPlayer.state
+            .map { it.currentKey to it.error }
+            .distinctUntilChanged()
+            .onEach { (_, error) -> error?.let { showAudioError(it) } }
+            .launchIn(lifecycleScope)
 
         messageInputViewModel.editMessageViewState.observe(this) { state ->
             when (state) {
@@ -1899,9 +1724,15 @@ class ChatActivity :
             }
         }
 
+        // The observer also gets the current value when the activity is recreated: no feedback for that
+        var lastRecordingInProgress = chatViewModel.getVoiceRecordingInProgress.value
         chatViewModel.getVoiceRecordingInProgress.observe(this) { voiceRecordingInProgress ->
-            VibrationUtils.vibrateShort(context)
+            if (shouldVibrateOnRecordingChange(lastRecordingInProgress, voiceRecordingInProgress)) {
+                VibrationUtils.vibrateShort(context)
+            }
+            lastRecordingInProgress = voiceRecordingInProgress
             if (voiceRecordingInProgress) {
+                chatAudioPlayer.pause()
                 window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             } else {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -2111,6 +1942,58 @@ class ChatActivity :
         binding.let { viewThemeUtils.material.themeFAB(it.voiceRecordingLock) }
 
         updateToolbarState()
+
+        isScreenResumed = true
+        currentConversation?.takeIf { isInitialLoadDone }?.let { conversation ->
+            ensureJoined()
+            if (hasBeenPaused) {
+                returnToChat(conversation)
+            }
+        }
+    }
+
+    /**
+     * Joining the room is the counterpart of leaving it in onPause: once per resume, as soon as the screen is shown
+     * and the capabilities are loaded. It does not depend on when the conversation is refreshed.
+     */
+    private fun ensureJoined() {
+        if (isInitialLoadDone && chatViewModel.claimRoomJoin()) {
+            joinRoomWithPassword()
+        }
+    }
+
+    private fun returnToChat(conversation: ConversationModel) {
+        sendSharedFiles()
+        if (focusInput && messageInputFragment.isAdded) {
+            messageInputFragment.binding.fragmentMessageInputView.requestFocus()
+        }
+        refreshConversationExtras(conversation)
+        updateRoomTimerHandler(MILLIS_250)
+    }
+
+    private fun sendSharedFiles() {
+        if (sharedFilePaths.isNotEmpty()) {
+            onChooseFileResult(sharedFilePaths.map { it.toUri() })
+            sharedFilePaths = emptyList()
+        }
+    }
+
+    private fun refreshConversationExtras(conversation: ConversationModel) {
+        refreshScheduledMessages()
+
+        if (conversation.type == ConversationEnums.ConversationType.ROOM_TYPE_ONE_TO_ONE_CALL &&
+            conversation.status == "dnd"
+        ) {
+            conversationUser.let {
+                val credentials = ApiUtils.getCredentials(it.username, it.token)
+                chatViewModel.outOfOfficeStatusOfUser(credentials!!, it.baseUrl!!, conversation.name)
+            }
+        }
+
+        conversationUser.let {
+            val credentials = ApiUtils.getCredentials(it.username, it.token)
+            chatViewModel.fetchUpcomingEvent(credentials!!, it.baseUrl!!, roomToken)
+        }
     }
 
     private fun setupChatToolbarView() {
@@ -2159,7 +2042,7 @@ class ChatActivity :
 
     fun updateToolbarState() {
         val conversation = currentConversation
-        val user = if (::conversationUser.isInitialized) conversationUser else null
+        val user = conversationUser
         val isOneToOne = isOneToOneConversation()
         val capabilitiesReady = ::spreedCapabilities.isInitialized
 
@@ -2171,11 +2054,11 @@ class ChatActivity :
             subtitle = buildToolbarSubtitle(conversation),
             avatarType = buildAvatarType(conversation),
             avatarUrl = buildAvatarUrl(user, conversation),
-            credentials = user?.let { ApiUtils.getCredentials(it.username, it.token) },
+            credentials = ApiUtils.getCredentials(user.username, user.token),
             userStatus = if (isOneToOne) conversation?.status else null,
             showVoiceCall = isCallsEnabled(capabilitiesReady, conversation),
             showVideoCall = isCallsEnabled(capabilitiesReady, conversation),
-            titleClickable = user?.userId != "?" && !chatToolbarState.isSearchMode,
+            titleClickable = user.userId != "?" && !chatToolbarState.isSearchMode,
             overflowItems = buildOverflowItems(),
             threadNotificationIcon = buildThreadNotificationIcon(capabilitiesReady),
             showEventMenu = conversation?.objectType == ConversationEnums.ObjectType.EVENT,
@@ -2346,54 +2229,33 @@ class ChatActivity :
     }
 
     private fun switchToRoom(token: String, startCallAfterRoomSwitch: Boolean, isVoiceOnlyCall: Boolean) {
-        if (::conversationUser.isInitialized) {
-            runOnUiThread {
-                val toastInfo = if (currentConversation?.objectType == ConversationEnums.ObjectType.ROOM) {
-                    context.resources.getString(R.string.switch_to_main_room)
-                } else {
-                    context.resources.getString(R.string.switch_to_breakout_room)
-                }
-                // do not replace with snackbar, as it would disappear with the activity switch
-                Toast.makeText(
-                    context,
-                    toastInfo,
-                    Toast.LENGTH_LONG
-                ).show()
+        runOnUiThread {
+            val toastInfo = if (currentConversation?.objectType == ConversationEnums.ObjectType.ROOM) {
+                context.resources.getString(R.string.switch_to_main_room)
+            } else {
+                context.resources.getString(R.string.switch_to_breakout_room)
             }
+            // do not replace with snackbar, as it would disappear with the activity switch
+            Toast.makeText(
+                context,
+                toastInfo,
+                Toast.LENGTH_LONG
+            ).show()
+        }
 
-            val bundle = Bundle()
-            bundle.putString(KEY_ROOM_TOKEN, token)
+        val bundle = Bundle()
 
-            if (startCallAfterRoomSwitch) {
-                bundle.putBoolean(KEY_START_CALL_AFTER_ROOM_SWITCH, true)
-                bundle.putBoolean(KEY_CALL_VOICE_ONLY, isVoiceOnlyCall)
-            }
+        if (startCallAfterRoomSwitch) {
+            bundle.putBoolean(KEY_START_CALL_AFTER_ROOM_SWITCH, true)
+            bundle.putBoolean(KEY_CALL_VOICE_ONLY, isVoiceOnlyCall)
+        }
 
-            leaveRoom {
-                val chatIntent = Intent(context, ChatActivity::class.java)
-                chatIntent.putExtras(bundle)
-                chatIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                startActivity(chatIntent)
-            }
+        leaveRoom {
+            val chatIntent = createIntent(context, conversationUserId, token, bundle)
+            chatIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            startActivity(chatIntent)
         }
     }
-
-    // override fun updateMediaPlayerProgressBySlider(message: ChatMessage, progress: Int) {
-    //     chatViewModel.seekToMediaPlayer(progress)
-    // }
-    //
-    // override fun registerMessageToObservePlaybackSpeedPreferences(
-    //     userId: String,
-    //     listener: (speed: PlaybackSpeed) -> Unit
-    // ) {
-    //     CoroutineScope(Dispatchers.Default).launch {
-    //         chatViewModel.voiceMessagePlayBackUIFlow.onEach { speed ->
-    //             withContext(Dispatchers.Main) {
-    //                 listener(speed)
-    //             }
-    //         }.collect()
-    //     }
-    // }
 
     @SuppressLint("LongLogTag")
     private fun downloadFileToCache(
@@ -2401,12 +2263,8 @@ class ChatActivity :
         openWhenDownloaded: Boolean,
         funToCallWhenDownloadSuccessful: (() -> Unit)
     ) {
-        message.isDownloadingVoiceMessage = true
-        chatViewModel.syncVoiceMessageUiState(message)
         message.openWhenDownloaded = openWhenDownloaded
 
-        val baseUrl = conversationUser.baseUrl
-        val userId = conversationUser.userId
         val attachmentFolder = CapabilitiesUtil.getAttachmentFolder(
             conversationUser.capabilities!!
                 .spreedCapability!!
@@ -2435,8 +2293,7 @@ class ChatActivity :
         }
 
         val data: Data = Data.Builder()
-            .putString(DownloadFileToCacheWorker.KEY_BASE_URL, baseUrl)
-            .putString(DownloadFileToCacheWorker.KEY_USER_ID, userId)
+            .putLong(KEY_INTERNAL_USER_ID, conversationUserId)
             .putString(DownloadFileToCacheWorker.KEY_ATTACHMENT_FOLDER, attachmentFolder)
             .putString(DownloadFileToCacheWorker.KEY_FILE_NAME, fileName)
             .putString(DownloadFileToCacheWorker.KEY_FILE_PATH, path)
@@ -2897,73 +2754,20 @@ class ChatActivity :
 
     fun showBrowserScreen() {
         val sharingFileBrowserIntent = Intent(this, RemoteFileBrowserActivity::class.java)
+        sharingFileBrowserIntent.putExtra(KEY_INTERNAL_USER_ID, conversationUserId)
         startRemoteFileBrowsingForResult.launch(sharingFileBrowserIntent)
     }
 
     fun showShareLocationScreen() {
         Log.d(TAG, "showShareLocationScreen")
 
-        val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
-        val isGpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
-
-        if (!isGpsEnabled) {
-            showLocationServicesDisabledDialog()
-        } else if (!permissionUtil.isLocationPermissionGranted()) {
-            showLocationPermissionDeniedDialog()
-        }
-
-        if (permissionUtil.isLocationPermissionGranted() && isGpsEnabled) {
-            val intent = Intent(this, LocationPickerActivity::class.java)
-            intent.putExtra(KEY_ROOM_TOKEN, roomToken)
-            intent.putExtra(BundleKeys.KEY_CHAT_API_VERSION, chatApiVersion)
-            startActivity(intent)
-        }
-    }
-
-    private fun showLocationServicesDisabledDialog() {
-        val title = resources.getString(R.string.location_services_disabled)
-        val explanation = resources.getString(R.string.location_services_disabled_msg)
-        val positive = resources.getString(R.string.nc_permissions_settings)
-        val cancel = resources.getString(R.string.nc_cancel)
-        val dialogBuilder = MaterialAlertDialogBuilder(this)
-            .setTitle(title)
-            .setMessage(explanation)
-            .setPositiveButton(positive) { _, _ ->
-                val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
-                startActivity(intent)
-            }
-            .setNegativeButton(cancel, null)
-
-        viewThemeUtils.dialog.colorMaterialAlertDialogBackground(this, dialogBuilder)
-        val dialog = dialogBuilder.show()
-        viewThemeUtils.platform.colorTextButtons(
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE),
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
-        )
-    }
-
-    private fun showLocationPermissionDeniedDialog() {
-        val title = resources.getString(R.string.location_permission_denied)
-        val explanation = resources.getString(R.string.location_permission_denied_msg)
-        val positive = resources.getString(R.string.nc_permissions_settings)
-        val cancel = resources.getString(R.string.nc_cancel)
-        val dialogBuilder = MaterialAlertDialogBuilder(this)
-            .setTitle(title)
-            .setMessage(explanation)
-            .setPositiveButton(positive) { _, _ ->
-                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.fromParts("package", packageName, null)
-                }
-                startActivity(intent)
-            }
-            .setNegativeButton(cancel, null)
-
-        viewThemeUtils.dialog.colorMaterialAlertDialogBackground(this, dialogBuilder)
-        val dialog = dialogBuilder.show()
-        viewThemeUtils.platform.colorTextButtons(
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE),
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
-        )
+        // location permission and location services are optional: without them, a place can still be picked on the
+        // map. The picker asks for the permission itself.
+        val intent = Intent(this, LocationPickerActivity::class.java)
+        intent.putExtra(KEY_INTERNAL_USER_ID, conversationUserId)
+        intent.putExtra(KEY_ROOM_TOKEN, roomToken)
+        intent.putExtra(BundleKeys.KEY_CHAT_API_VERSION, chatApiVersion)
+        startActivity(intent)
     }
 
     private fun showConversationInfoScreen() {
@@ -2980,6 +2784,7 @@ class ChatActivity :
 
         val intent = Intent(this, ConversationInfoActivity::class.java)
         intent.putExtras(bundle)
+        intent.putExtra(KEY_INTERNAL_USER_ID, conversationUserId)
         startActivity(intent)
     }
 
@@ -2990,17 +2795,15 @@ class ChatActivity :
 
     @Suppress("Detekt.TooGenericExceptionCaught")
     private fun cancelNotificationsForCurrentConversation() {
-        if (::conversationUser.isInitialized) {
-            if (!TextUtils.isEmpty(roomToken)) {
-                try {
-                    NotificationUtils.cancelExistingNotificationsForRoom(
-                        applicationContext,
-                        conversationUser!!,
-                        roomToken
-                    )
-                } catch (e: RuntimeException) {
-                    Log.w(TAG, "Cancel notifications for current conversation results with an error.", e)
-                }
+        if (!TextUtils.isEmpty(roomToken)) {
+            try {
+                NotificationUtils.cancelExistingNotificationsForRoom(
+                    applicationContext,
+                    conversationUser!!,
+                    roomToken
+                )
+            } catch (e: RuntimeException) {
+                Log.w(TAG, "Cancel notifications for current conversation results with an error.", e)
             }
         }
     }
@@ -3009,6 +2812,9 @@ class ChatActivity :
         super.onPause()
 
         logConversationInfos("onPause")
+
+        isScreenResumed = false
+        hasBeenPaused = true
 
         eventBus.unregister(this)
 
@@ -3021,7 +2827,7 @@ class ChatActivity :
             getRoomInfoTimerHandler?.removeCallbacksAndMessages(null)
         }
 
-        if (::conversationUser.isInitialized && isActivityNotChangingConfigurations() && isNotInCall()) {
+        if (isActivityNotChangingConfigurations() && isNotInCall()) {
             if (isLeavingRoom) {
                 Log.d(TAG, "not leaving room (leave already in progress)")
             } else if (validSessionId()) {
@@ -3070,7 +2876,9 @@ class ChatActivity :
         super.onDestroy()
         logConversationInfos("onDestroy")
 
-        chatViewModel.leaveRoomViewState.removeObserver(leaveRoomObserver)
+        if (::initialUser.isInitialized) {
+            chatViewModel.leaveRoomViewState.removeObserver(leaveRoomObserver)
+        }
 
         findViewById<View>(R.id.toolbar)?.setOnClickListener(null)
 
@@ -3083,8 +2891,10 @@ class ChatActivity :
 
     private fun joinRoomWithPassword() {
         // if ApplicationWideCurrentRoomHolder contains a session (because a call is active), then keep the sessionId
-        if (ApplicationWideCurrentRoomHolder.getInstance().currentRoomToken ==
-            currentConversation!!.token
+        if (ApplicationWideCurrentRoomHolder.getInstance().isCurrentRoom(
+                currentConversation!!.token,
+                conversationUser.id
+            )
         ) {
             sessionIdAfterRoomJoined = ApplicationWideCurrentRoomHolder.getInstance().session
 
@@ -3116,12 +2926,11 @@ class ChatActivity :
             webSocketInstance?.joinRoomWithRoomTokenAndSession("", sessionIdAfterRoomJoined)
         }
         sessionIdAfterRoomJoined = "0"
+        // the session is left now, so a chat opened before the leave is answered must not reuse it
+        ApplicationWideCurrentRoomHolder.getInstance().clear()
 
-        var apiVersion = 1
         // FIXME Fix API checking with guests?
-        if (::conversationUser.isInitialized) {
-            apiVersion = ApiUtils.getConversationApiVersion(conversationUser, intArrayOf(ApiUtils.API_V4, 1))
-        }
+        val apiVersion = ApiUtils.getConversationApiVersion(conversationUser, intArrayOf(ApiUtils.API_V4, 1))
 
         val startNanoTime = System.nanoTime()
         Log.d(TAG, "leaveRoom - leaveRoom - calling: $startNanoTime")
@@ -3137,8 +2946,8 @@ class ChatActivity :
     }
 
     private fun setupWebsocket() {
-        if (currentConversation == null || !::conversationUser.isInitialized) {
-            Log.e(TAG, "setupWebsocket: currentConversation or conversationUser is null")
+        if (currentConversation == null) {
+            Log.e(TAG, "setupWebsocket: currentConversation is null")
             return
         }
 
@@ -3231,6 +3040,7 @@ class ChatActivity :
     private fun openScheduledMessages() {
         val intent = Intent(this, ScheduledMessagesActivity::class.java).apply {
             putExtra(ScheduledMessagesActivity.ROOM_TOKEN, roomToken)
+            putExtra(KEY_INTERNAL_USER_ID, conversationUserId)
             putExtra(ScheduledMessagesActivity.CONVERSATION_NAME, currentConversation?.displayName.orEmpty())
             if (conversationThreadId != null && conversationThreadId!! > 0) {
                 putExtra(ScheduledMessagesActivity.THREAD_ID, conversationThreadId)
@@ -3471,6 +3281,7 @@ class ChatActivity :
 
     private fun showSharedItems() {
         val intent = Intent(this, SharedItemsActivity::class.java)
+        intent.putExtra(KEY_INTERNAL_USER_ID, conversationUserId)
         intent.putExtra(KEY_CONVERSATION_NAME, currentConversation?.displayName)
         intent.putExtra(KEY_ROOM_TOKEN, roomToken)
         intent.putExtra(
@@ -3505,20 +3316,18 @@ class ChatActivity :
 
     private fun startACall(isVoiceOnlyCall: Boolean, callWithoutNotification: Boolean) {
         currentConversation?.let {
-            if (::conversationUser.isInitialized) {
-                if (CapabilitiesUtil.isCallEndToEndEncryptionEnabled(spreedCapabilities)) {
-                    Snackbar.make(binding.root, R.string.nc_call_e2ee_not_supported, Snackbar.LENGTH_LONG).show()
-                    return
-                }
-                val pp = ParticipantPermissions(spreedCapabilities, it)
-                if (!pp.canStartCall() && currentConversation?.hasCall == false) {
-                    Snackbar.make(binding.root, R.string.startCallForbidden, Snackbar.LENGTH_LONG).show()
-                } else {
-                    ApplicationWideCurrentRoomHolder.getInstance().isDialing = true
-                    val callIntent = getIntentForCall(isVoiceOnlyCall, callWithoutNotification)
-                    if (callIntent != null) {
-                        startActivity(callIntent)
-                    }
+            if (CapabilitiesUtil.isCallEndToEndEncryptionEnabled(spreedCapabilities)) {
+                Snackbar.make(binding.root, R.string.nc_call_e2ee_not_supported, Snackbar.LENGTH_LONG).show()
+                return
+            }
+            val pp = ParticipantPermissions(spreedCapabilities, it)
+            if (!pp.canStartCall() && currentConversation?.hasCall == false) {
+                Snackbar.make(binding.root, R.string.startCallForbidden, Snackbar.LENGTH_LONG).show()
+            } else {
+                ApplicationWideCurrentRoomHolder.getInstance().isDialing = true
+                val callIntent = getIntentForCall(isVoiceOnlyCall, callWithoutNotification)
+                if (callIntent != null) {
+                    startActivity(callIntent)
                 }
             }
         }
@@ -3556,6 +3365,7 @@ class ChatActivity :
 
             val callIntent = Intent(this, CallActivity::class.java)
             callIntent.putExtras(bundle)
+            callIntent.putExtra(KEY_INTERNAL_USER_ID, conversationUserId)
             return callIntent
         } ?: run {
             return null
@@ -3634,22 +3444,19 @@ class ChatActivity :
             )
             Snackbar.make(binding.root, R.string.nc_common_error_sorry, Snackbar.LENGTH_LONG).show()
         } else {
-            var apiVersion = 1
             // FIXME Fix API checking with guests?
-            if (::conversationUser.isInitialized) {
-                apiVersion = ApiUtils.getChatApiVersion(spreedCapabilities, intArrayOf(1))
-            }
+            val apiVersion = ApiUtils.getChatApiVersion(spreedCapabilities, intArrayOf(1))
 
-            chatViewModel.deleteChatMessages(
-                credentials!!,
+            val urlsByMessageId = chatViewModel.messageIdsToDelete(message.jsonMessageId).associateWith { id ->
                 ApiUtils.getUrlForChatMessage(
                     apiVersion,
                     conversationUser.baseUrl!!,
                     roomToken,
-                    message.jsonMessageId.toString()
-                ),
-                message.jsonMessageId
-            )
+                    id.toString()
+                )
+            }
+
+            chatViewModel.deleteChatMessages(credentials!!, urlsByMessageId)
         }
     }
 
@@ -3677,6 +3484,7 @@ class ChatActivity :
 
         val intent = Intent(this, ConversationsListActivity::class.java)
         intent.putExtras(bundle)
+        intent.putExtra(KEY_INTERNAL_USER_ID, conversationUserId)
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         startActivity(intent)
         finish()
@@ -3697,7 +3505,8 @@ class ChatActivity :
             setContent {
                 DateTimeCompose(
                     bundle,
-                    chatViewModel
+                    chatViewModel,
+                    conversationUser
                 ).GetDateTimeDialog(shouldDismiss, this@ChatActivity)
             }
         }
@@ -3802,6 +3611,7 @@ class ChatActivity :
         bundle.putString(BundleKeys.KEY_TRANSLATE_MESSAGE, message?.getRichText())
 
         val intent = Intent(this, TranslateActivity::class.java)
+        intent.putExtra(KEY_INTERNAL_USER_ID, conversationUserId)
         intent.putExtras(bundle)
         startActivity(intent)
     }
@@ -3991,6 +3801,7 @@ class ChatActivity :
                 chatViewModel.shareLocationToNotes(
                     credentials!!,
                     ApiUtils.getUrlToSendLocation(apiVersion, conversationUser!!.baseUrl!!, roomToken),
+                    ApiUtils.getUrlForChat(apiVersion, conversationUser!!.baseUrl!!, roomToken),
                     "geo-location",
                     objectId,
                     metaData
@@ -4022,10 +3833,7 @@ class ChatActivity :
     }
 
     fun openNoteToSelfConversation(noteToSelfRoomToken: String) {
-        val bundle = Bundle()
-        bundle.putString(KEY_ROOM_TOKEN, noteToSelfRoomToken)
-        val chatIntent = Intent(context, ChatActivity::class.java)
-        chatIntent.putExtras(bundle)
+        val chatIntent = createIntent(context, conversationUserId, noteToSelfRoomToken)
         chatIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         startActivity(chatIntent)
     }
@@ -4084,8 +3892,6 @@ class ChatActivity :
     }
 
     fun userAllowedByPrivilages(message: ChatMessage): Boolean {
-        if (!::conversationUser.isInitialized) return false
-
         val isUserAllowedByPrivileges = if (message.actorId == conversationUser!!.userId) {
             true
         } else {
@@ -4182,9 +3988,7 @@ class ChatActivity :
     }
 
     fun createPoll() {
-        val pollVoteDialog = PollCreateDialogFragment.newInstance(
-            roomToken
-        )
+        val pollVoteDialog = PollCreateDialogFragment.newInstance(conversationUser, roomToken)
         pollVoteDialog.show(supportFragmentManager, TAG)
     }
 
@@ -4196,10 +4000,8 @@ class ChatActivity :
 
     fun openThread(messageId: Long) {
         val bundle = Bundle()
-        bundle.putString(KEY_ROOM_TOKEN, roomToken)
         bundle.putLong(KEY_THREAD_ID, messageId)
-        val chatIntent = Intent(context, ChatActivity::class.java)
-        chatIntent.putExtras(bundle)
+        val chatIntent = createIntent(context, conversationUserId, roomToken, bundle)
         startActivity(chatIntent)
     }
 
@@ -4217,6 +4019,7 @@ class ChatActivity :
 
         val threadsOverviewIntent = Intent(context, ThreadsOverviewActivity::class.java)
         threadsOverviewIntent.putExtras(bundle)
+        threadsOverviewIntent.putExtra(KEY_INTERNAL_USER_ID, conversationUserId)
         startActivity(threadsOverviewIntent)
     }
 
@@ -4303,6 +4106,16 @@ class ChatActivity :
 
     companion object {
         val TAG = ChatActivity::class.java.simpleName
+
+        /**
+         * Creates an intent that opens the conversation [roomToken] of the account with the internal id [userId].
+         */
+        fun createIntent(context: Context, userId: Long, roomToken: String, extras: Bundle? = null): Intent =
+            Intent(context, ChatActivity::class.java).apply {
+                extras?.let { putExtras(it) }
+                putExtra(KEY_ROOM_TOKEN, roomToken)
+                putExtra(KEY_INTERNAL_USER_ID, userId)
+            }
         private const val CONTENT_TYPE_CALL_STARTED: Byte = 1
         private const val CONTENT_TYPE_SYSTEM_MESSAGE: Byte = 2
         private const val CONTENT_TYPE_UNREAD_NOTICE_MESSAGE: Byte = 3
@@ -4315,9 +4128,6 @@ class ChatActivity :
         private const val GET_ROOM_INFO_DELAY_NORMAL: Long = 30000
         private const val GET_ROOM_INFO_DELAY_LOBBY: Long = 5000
         private const val MILLIS_250 = 250L
-        private const val MILLIS_150 = 150L
-        private const val MILLIS_1000 = 1000L
-        private const val FLOAT_100 = 100f
         private const val AGE_THRESHOLD_FOR_DELETE_MESSAGE: Int = 21600000 // (6 hours in millis = 6 * 3600 * 1000)
         private const val REQUEST_SHARE_FILE_PERMISSION: Int = 221
         private const val REQUEST_RECORD_AUDIO_PERMISSION = 222
@@ -4326,7 +4136,6 @@ class ChatActivity :
         private const val FILE_DATE_PATTERN = "yyyy-MM-dd HH-mm-ss"
         private const val VIDEO_SUFFIX = ".mp4"
         private const val PICTURE_SUFFIX = ".jpg"
-        private const val VOICE_MESSAGE_SEEKBAR_BASE = 1000
         private const val HTTP_BAD_REQUEST = 400
         private const val HTTP_FORBIDDEN = 403
         private const val HTTP_NOT_FOUND = 404
@@ -4339,20 +4148,12 @@ class ChatActivity :
         private const val NOTIFICATION_LEVEL_NEVER = 3
         private const val ONE_SECOND_IN_MILLIS = 1000
         private const val MILLISEC_15: Long = 15
-        private const val CURRENT_AUDIO_MESSAGE_KEY = "CURRENT_AUDIO_MESSAGE"
-        private const val CURRENT_AUDIO_POSITION_KEY = "CURRENT_AUDIO_POSITION"
-        private const val CURRENT_AUDIO_WAS_PLAYING_KEY = "CURRENT_AUDIO_PLAYING"
-        private const val RESUME_AUDIO_TAG = "RESUME_AUDIO_TAG"
         private const val FIVE_MINUTES_IN_SECONDS: Long = 300
         private const val ROOM_TYPE_ONE_TO_ONE = "1"
         private const val ACTOR_TYPE = "users"
         const val CONVERSATION_INTERNAL_ID = "CONVERSATION_INTERNAL_ID"
         const val NO_OFFLINE_MESSAGES_FOUND = "NO_OFFLINE_MESSAGES_FOUND"
         private const val NO_MORE_RESULTS_TOAST_THROTTLE_MS: Long = 2000
-        const val VOICE_MESSAGE_CONTINUOUS_BEFORE = -5
-        const val VOICE_MESSAGE_CONTINUOUS_AFTER = 5
-        const val VOICE_MESSAGE_PLAY_ADD_THRESHOLD = 0.1
-        const val VOICE_MESSAGE_MARK_PLAYED_FACTOR = 20
         const val OUT_OF_OFFICE_ALPHA = 76
         const val ZERO_INDEX = 0
         const val ONE_INDEX = 1
@@ -4373,3 +4174,9 @@ internal fun resolveReplyToMessageId(replyMessageId: Int?, draftQuotedJsonId: In
     val replyId = replyMessageId?.takeIf { it != 0 } ?: draftQuotedJsonId?.takeIf { it != 0 }
     return replyId ?: threadId ?: 0
 }
+
+/**
+ * Feedback is for the user starting or ending a recording, not for an activity which only shows the state again.
+ */
+internal fun shouldVibrateOnRecordingChange(previous: Boolean?, current: Boolean): Boolean =
+    current != (previous ?: false)
