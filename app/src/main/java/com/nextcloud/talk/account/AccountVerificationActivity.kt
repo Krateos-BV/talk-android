@@ -109,7 +109,7 @@ class AccountVerificationActivity : BaseActivity() {
                 !UriUtils.hasHttpProtocolPrefixed(baseUrl!!) ||
                 isNotSameProtocol(baseUrl!!, originalProtocol)
             ) {
-                determineBaseUrlProtocol(true)
+                determineBaseUrlProtocol()
             } else {
                 findServerTalkApp()
             }
@@ -164,15 +164,14 @@ class AccountVerificationActivity : BaseActivity() {
     }
 
     @Suppress("TooGenericExceptionCaught")
-    private suspend fun determineBaseUrlProtocol(checkForcedHttps: Boolean) {
+    private suspend fun determineBaseUrlProtocol() {
         cookieManager.cookieStore.removeAll()
         baseUrl = baseUrl!!.replace("http://", "").replace("https://", "")
-        val scheme = if (checkForcedHttps) "https" else "http"
-        val queryUrl = "$scheme://$baseUrl${ApiUtils.getUrlPostfixForStatus()}"
+        val queryUrl = "https://$baseUrl${ApiUtils.getUrlPostfixForStatus()}"
 
         try {
             ncApiCoroutines.getServerStatus(queryUrl)
-            baseUrl = "$scheme://$baseUrl"
+            baseUrl = "https://$baseUrl"
             if (isAccountImport) {
                 val bundle = Bundle()
                 bundle.putString(KEY_BASE_URL, baseUrl)
@@ -186,13 +185,8 @@ class AccountVerificationActivity : BaseActivity() {
                 findServerTalkApp()
             }
         } catch (e: Exception) {
-            if (checkForcedHttps) {
-                logger.w(TAG, "Server status check failed for https scheme, retrying with http", e)
-                determineBaseUrlProtocol(false)
-            } else {
-                logger.e(TAG, "Failed to determine base url protocol", e)
-                abortVerification()
-            }
+            logger.e(TAG, "Server status check over https failed", e)
+            abortVerification()
         }
     }
 

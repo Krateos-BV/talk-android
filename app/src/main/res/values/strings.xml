@@ -93,6 +93,7 @@ How to translate with transifex:
     <string name="nc_certificate_dialog_title">Check out the certificate</string>
     <string name="nc_certificate_dialog_text">Do you trust the until now unknown SSL certificate, issued by %1$s for %2$s, valid from %3$s to %4$s?</string>
     <string name="nc_certificate_error">Your SSL setup prevented connection</string>
+    <string name="nc_server_https_required">Only secure server addresses (https://) are supported</string>
 
     <!-- Settings -->
     <string name="nc_settings_advanced_title">Advanced</string>

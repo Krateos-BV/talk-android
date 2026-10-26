@@ -300,6 +300,38 @@ class LoginRepositoryTest {
         assertEquals("testpass", result?.appPassword)
     }
 
+    @Test
+    fun `startLoginFlowFromQR refuses a cleartext http server`() {
+        val qrData = "nc://login/user:testuser&server:http%3A//example.com&password:testpass"
+
+        val result = repo.startLoginFlowFromQR(qrData)
+
+        assertNull(result)
+    }
+
+    @Test
+    fun `startOTPLoginFlow refuses a cleartext http server before contacting it`() =
+        runTest {
+            val qrData = "nc://onetime-login/user:testuser&server:http%3A//example.com&password:testpass"
+
+            val result = repo.startOTPLoginFlow(qrData)
+
+            assertNull(result)
+            verify(networkLoginDataSource, never()).oneTimePasswordRequest(any(), any())
+        }
+
+    @Test
+    fun `pollLogin refuses a login that completes on a cleartext http server`() =
+        runTest {
+            val mockResponse = LoginResponse("token123", "https://server.com/poll", "https://server.com/login")
+            whenever(networkLoginDataSource.performLoginFlowV2(mockResponse))
+                .thenReturn(LoginCompletion(200, "http://server.com", "testuser", "apppass123"))
+
+            val result = repo.pollLogin(mockResponse)
+
+            assertNull(result)
+        }
+
     // ========== startLoginFlow() Tests ==========
 
     @Test

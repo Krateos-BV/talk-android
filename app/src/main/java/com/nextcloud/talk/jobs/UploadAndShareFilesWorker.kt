@@ -493,18 +493,6 @@ class UploadAndShareFilesWorker(val context: Context, workerParameters: WorkerPa
 
         fun requestStoragePermission(activity: Activity) {
             when {
-                Build.VERSION
-                    .SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
-                    activity.requestPermissions(
-                        arrayOf(
-                            Manifest.permission.READ_MEDIA_IMAGES,
-                            Manifest.permission.READ_MEDIA_VIDEO,
-                            Manifest.permission.READ_MEDIA_AUDIO
-                        ),
-                        REQUEST_PERMISSION
-                    )
-                }
-
                 Build.VERSION.SDK_INT > Build.VERSION_CODES.Q -> {
                     activity.requestPermissions(
                         arrayOf(

@@ -1451,9 +1451,7 @@ class SettingsActivity :
         when (requestCode) {
             ContactAddressBookWorker.REQUEST_PERMISSION -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    WorkManager
-                        .getInstance(this)
-                        .enqueue(OneTimeWorkRequest.Builder(ContactAddressBookWorker::class.java).build())
+                    ContactAddressBookWorker.enqueueUpload(this, force = false)
                     checkForPhoneNumber()
                 } else {
                     appPreferences.setPhoneBookIntegration(false)

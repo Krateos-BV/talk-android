@@ -40,22 +40,9 @@ class PlatformPermissionUtilImpl(private val context: Context) : PlatformPermiss
 
     override fun isFilesPermissionGranted(): Boolean =
         when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
-                if (
-                    PermissionChecker.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES)
-                    == PermissionChecker.PERMISSION_GRANTED ||
-                    PermissionChecker.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VIDEO)
-                    == PermissionChecker.PERMISSION_GRANTED ||
-                    PermissionChecker.checkSelfPermission(context, Manifest.permission.READ_MEDIA_AUDIO)
-                    == PermissionChecker.PERMISSION_GRANTED
-                ) {
-                    Log.d(TAG, "Permission is granted (SDK 33 or greater)")
-                    true
-                } else {
-                    Log.d(TAG, "Permission is revoked (SDK 33 or greater)")
-                    false
-                }
-            }
+            // Attachments come from the Photo Picker, the Storage Access Framework, the camera or a share
+            // intent, which all grant access to their own URIs, so Android 13+ needs no media permission.
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> true
             Build.VERSION.SDK_INT > Build.VERSION_CODES.Q -> {
                 if (PermissionChecker.checkSelfPermission(
                         context,

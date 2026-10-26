@@ -51,6 +51,10 @@ class LoginRepository(val network: NetworkLoginDataSource, val local: LocalLogin
                 }
 
                 if (loginData.status == HTTP_OK) {
+                    if (isCleartextServer(loginData.server)) {
+                        Log.e(TAG, "Login flow returned a cleartext http server, login refused")
+                        return@withContext null
+                    }
                     return@withContext loginData
                 }
 
@@ -98,6 +102,11 @@ class LoginRepository(val network: NetworkLoginDataSource, val local: LocalLogin
             }
         }
 
+        if (isCleartextServer(server)) {
+            Log.e(TAG, "QR code names a cleartext http server, login refused")
+            return null
+        }
+
         return if (server.isNotEmpty() && loginName.isNotEmpty() && appPassword.isNotEmpty()) {
             LoginCompletion(HTTP_OK, server, loginName, appPassword)
         } else {
@@ -142,6 +151,11 @@ class LoginRepository(val network: NetworkLoginDataSource, val local: LocalLogin
                         server = URLDecoder.decode(value.removePrefix(SERVER_KEY), "UTF-8")
                     }
                 }
+            }
+
+            if (isCleartextServer(server)) {
+                Log.e(TAG, "QR code names a cleartext http server, login refused")
+                return@withContext null
             }
 
             // Need to use the qr code token to create temporary credentials to get access to the actual app password
@@ -192,6 +206,8 @@ class LoginRepository(val network: NetworkLoginDataSource, val local: LocalLogin
             return startAccountVerification(loginData)
         }
     }
+
+    private fun isCleartextServer(server: String): Boolean = server.startsWith("http://", ignoreCase = true)
 
     private fun startAccountVerification(loginData: LoginCompletion): Bundle {
         val bundle = Bundle()

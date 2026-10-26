@@ -6,13 +6,16 @@
   ~ SPDX-License-Identifier: GPL-3.0-or-later
 -->
 <network-security-config>
-    <!-- Allowing cleartextTrafficPermitted - we don't control the server yet strongly suggesting TLS/SSL -->
-    <base-config cleartextTrafficPermitted="true">
+    <!-- All traffic must use TLS; servers are only reachable over https:// and wss://. -->
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system"/>
-            <!-- We allow user-certificates so managed device can make use of self-signed/client certificates -->
-            <certificates src="user"/>
         </trust-anchors>
     </base-config>
+    <!-- Applies only to debuggable builds, so a debugging proxy with a user-installed CA can be used. -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="user"/>
+        </trust-anchors>
+    </debug-overrides>
 </network-security-config>
-
