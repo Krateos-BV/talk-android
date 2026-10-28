@@ -547,7 +547,6 @@
     <string name="nc_shared_location">Udostępniona lokalizacja</string>
     <string name="nc_shortcut_conversation_deleted">Ta rozmowa już nie istnieje</string>
     <string name="nc_shortcut_created">Utworzono skrót</string>
-    <string name="nc_show_ecosystem_description">Sugestie aplikacji Nextcloud w oknie wyboru konta</string>
     <string name="nc_show_ecosystem_title">Pokaż przełącznik aplikacji</string>
     <string name="nc_show_notification_warning_description">Gdy powiadomienia nie są poprawnie skonfigurowane, wyświetlaj regularne ostrzeżenie</string>
     <string name="nc_show_notification_warning_title">Pokaż regularne ostrzeżenie o powiadomieniu</string>

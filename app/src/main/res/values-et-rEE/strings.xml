@@ -562,12 +562,12 @@
     <string name="nc_settings_logs_title">Logid</string>
     <string name="nc_settings_media_quality_title">Saadetud meediumi kvaliteet</string>
     <string name="nc_settings_no_ringtone">Heli puudub</string>
-    <string name="nc_settings_no_talk_installed">Nextcloudi kõnerakendus (Nextcloud Talk), mille autentimist kasutasid, pole serverisse paigaldatud</string>
+    <string name="nc_settings_no_talk_installed">XeniaCloudi kõnerakendus (Xenia Talk), mille autentimist kasutasid, pole serverisse paigaldatud</string>
     <string name="nc_settings_notification_sounds_post_oreo">Teavitused</string>
     <string name="nc_settings_notifications_declined">Teavitused pole lubatud</string>
     <string name="nc_settings_notifications_granted">Teavitused on lubatud</string>
     <string name="nc_settings_other_notifications_ringtone">Sõnumid</string>
-    <string name="nc_settings_phone_book_integration_desc">Otsi telefoni kontaktide andmete ja Nextcloud Talk rakenduse andmete vasteid telefoninumbri alusel</string>
+    <string name="nc_settings_phone_book_integration_desc">Otsi telefoni kontaktide andmete ja Xenia Talk rakenduse andmete vasteid telefoninumbri alusel</string>
     <string name="nc_settings_phone_book_integration_phone_number_dialog_429">Viga 429 - liiga palju päringuid</string>
     <string name="nc_settings_phone_book_integration_phone_number_dialog_description">Võid lisada oma telefoninumbri, mille alusel teised kasutajad saavad sind leida</string>
     <string name="nc_settings_phone_book_integration_phone_number_dialog_edit_text_hint">Sisesta telefoninumber</string>
@@ -628,7 +628,6 @@
     <string name="nc_shared_location">Jagatud asukoht</string>
     <string name="nc_shortcut_conversation_deleted">Seda vestlust pole enam olemas</string>
     <string name="nc_shortcut_created">Otselink on lisatud</string>
-    <string name="nc_show_ecosystem_description">Nextcloudi rakenduste soovitused kasutajakonto valimisvaates</string>
     <string name="nc_show_ecosystem_title">Näita rakenduste vahetajat</string>
     <string name="nc_show_notification_warning_description">Näita tavalist hoiatust, kui teavitused pole korrektselt seadistatud</string>
     <string name="nc_show_notification_warning_title">Näita tavalist teavituse hoiatust</string>
@@ -750,7 +749,7 @@
     <string name="scope_federated_title">Liitpilves</string>
     <string name="scope_local_description">Nähtav vaid selle serveri kasutajatele ja külalistele</string>
     <string name="scope_local_title">Kohalik</string>
-    <string name="scope_private_description">Nähtav vaid osalejatele, kes on läbi teinud tuvastamise telefoninumbri alusel kasutades Nextcloud Talk rakendust</string>
+    <string name="scope_private_description">Nähtav vaid osalejatele, kes on läbi teinud tuvastamise telefoninumbri alusel kasutades Xenia Talk rakendust</string>
     <string name="scope_private_title">Privaatne</string>
     <string name="scope_published_description">Sünkrooni usaldusväärsetesse serveritesse ning üldisesse ja avalikku aadressiraamatusse</string>
     <string name="scope_published_title">Avaldatud</string>

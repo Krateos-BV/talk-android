@@ -566,7 +566,6 @@
     <string name="nc_shared_location">مکان هم‌رسانی‌شده</string>
     <string name="nc_shortcut_conversation_deleted">این گفتگو دیگر وجود ندارد</string>
     <string name="nc_shortcut_created">میانبر ایجاد شد</string>
-    <string name="nc_show_ecosystem_description">پیشنهادهای برنامه نکست‌کلود در گفتگوی انتخاب حساب</string>
     <string name="nc_show_ecosystem_title">نمایش تغییردهنده برنامه</string>
     <string name="nc_show_notification_warning_description">هنگامی که اعلان‌ها به درستی تنظیم نشده‌اند، یک هشدار معمولی نشان بده</string>
     <string name="nc_show_notification_warning_title">نمایش هشدار معمولی اعلان</string>

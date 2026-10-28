@@ -602,7 +602,6 @@
     <string name="nc_shared_location">Bendrinta vieta</string>
     <string name="nc_shortcut_conversation_deleted">Šio pokalbio jau nebėra</string>
     <string name="nc_shortcut_created">Sukurtas sparčiojo paleidimo mygtukas</string>
-    <string name="nc_show_ecosystem_description">„Nextcloud“ programėlės pasiūlymai paskyros pasirinkimo dialogo lange</string>
     <string name="nc_show_ecosystem_title">Rodyti programėllių perjungiklį</string>
     <string name="nc_show_notification_warning_description">Jei pranešimai nėra tinkamai sukonfigūruoti, rodyti įprastą įspėjimą</string>
     <string name="nc_show_notification_warning_title">Rodyti įprastą įspėjimą</string>

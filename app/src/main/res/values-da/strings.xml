@@ -601,7 +601,6 @@
     <string name="nc_shared_location">Delt placering</string>
     <string name="nc_shortcut_conversation_deleted">Denne samtale eksisterer ikke længere</string>
     <string name="nc_shortcut_created">Genvej oprettet</string>
-    <string name="nc_show_ecosystem_description">Nextcloud app- forslag i kontovælgerdialogen</string>
     <string name="nc_show_ecosystem_title">Vis app skifter</string>
     <string name="nc_show_notification_warning_description">Når notifikationer ikke er opsat korrekt, så vis en regulær advarsel</string>
     <string name="nc_show_notification_warning_title">Vis regulær notifikationsadvarsel</string>
