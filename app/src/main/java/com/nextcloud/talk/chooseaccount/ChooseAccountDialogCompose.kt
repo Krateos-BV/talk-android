@@ -285,7 +285,7 @@ class ChooseAccountDialogCompose {
     private fun getAccountHandle(user: User): String = user.username + "@" + user.baseUrl?.toUri()?.host
 
     private fun openEcosystemMore(activity: Activity) {
-        LinkHelper.openAppStore("Nextcloud", true, activity)
+        LinkHelper.openAppStore("XeniaCloud", true, activity)
     }
 
     @Composable

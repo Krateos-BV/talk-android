@@ -517,7 +517,6 @@
     <string name="nc_shared_items_empty">Nessun elemento condiviso</string>
     <string name="nc_shared_items_location">Posizione</string>
     <string name="nc_shared_location">Posizione condivisa</string>
-    <string name="nc_show_ecosystem_description">Suggerimenti per le app Nextcloud nella finestra di dialogo di selezione dell\'account</string>
     <string name="nc_show_ecosystem_title">Mostra il selettore delle applicazioni</string>
     <string name="nc_show_notification_warning_description">Quando le notifiche non sono impostate correttamente, mostra un avviso regolare</string>
     <string name="nc_show_notification_warning_title">Mostra avviso di notifica regolare</string>

@@ -628,7 +628,6 @@
     <string name="nc_shared_location">分享了的位置</string>
     <string name="nc_shortcut_conversation_deleted">此對話不存在</string>
     <string name="nc_shortcut_created">已建立捷徑</string>
-    <string name="nc_show_ecosystem_description">在帳戶選擇對話框中顯示 Nextcloud 應用程式建議</string>
     <string name="nc_show_ecosystem_title">顯示應用程式切換器</string>
     <string name="nc_show_notification_warning_description">當通知未正確設置時，顯示常規警告。</string>
     <string name="nc_show_notification_warning_title">顯示常規警告。</string>

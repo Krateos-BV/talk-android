@@ -555,7 +555,6 @@
     <string name="nc_shared_location">Опубликованы сведения о местоположении</string>
     <string name="nc_shortcut_conversation_deleted">Этот разговор больше не существует</string>
     <string name="nc_shortcut_created">Ярлык создан</string>
-    <string name="nc_show_ecosystem_description">Предложения приложений Nextcloud в диалоговом окне выбора учётной записи</string>
     <string name="nc_show_ecosystem_title">Показать переключатель приложений</string>
     <string name="nc_show_notification_warning_description">Периодически предупреждать о некорректной настройке уведомлений</string>
     <string name="nc_show_notification_warning_title">Периодически выводить предупреждение об уведомлениях</string>

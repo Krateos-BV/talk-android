@@ -629,7 +629,6 @@
     <string name="nc_shared_location">Zdieľaná poloha</string>
     <string name="nc_shortcut_conversation_deleted">Táto konverzácia už neexistuje</string>
     <string name="nc_shortcut_created">Skratka bola vytvorená</string>
-    <string name="nc_show_ecosystem_description">Odporúčania aplikácií Nextcloud v dialógovom okne výberu účtu</string>
     <string name="nc_show_ecosystem_title">Zobraziť prepínač aplikácií</string>
     <string name="nc_show_notification_warning_description">V príprade nesprávne nastavených upozornení, zobraziť štandardné upozornenie</string>
     <string name="nc_show_notification_warning_title">Zobraziť štandardné upozornenie</string>

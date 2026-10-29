@@ -524,7 +524,6 @@
     <string name="nc_shared_items_empty">No hay elementos compartidos</string>
     <string name="nc_shared_items_location">Ubicación</string>
     <string name="nc_shared_location">Ubicación compartida</string>
-    <string name="nc_show_ecosystem_description">Sugerencias de aplicaciones de Nextcloud en el cuadro de diálogo de la cuenta seleccionada</string>
     <string name="nc_show_ecosystem_title">Mostrar conmutador de apps</string>
     <string name="nc_show_notification_warning_description">Cuando las notificaciones no están configuradas correctamente, mostrar un aviso periódico</string>
     <string name="nc_show_notification_warning_title">Mostrar aviso periódico sobre notificaciones</string>

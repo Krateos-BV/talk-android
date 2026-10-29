@@ -628,7 +628,6 @@
     <string name="nc_shared_location">Position partagée</string>
     <string name="nc_shortcut_conversation_deleted">Cette conversation n\'existe plus</string>
     <string name="nc_shortcut_created">Raccourci créé</string>
-    <string name="nc_show_ecosystem_description">Suggestions d\'applications Nextcloud dans la boîte de dialogue de sélection de compte</string>
     <string name="nc_show_ecosystem_title">Afficher le sélecteur d\'applications</string>
     <string name="nc_show_notification_warning_description">Quand les notifications ne sont pas correctement configurées, afficher un avertissement régulier</string>
     <string name="nc_show_notification_warning_title">Afficher un avertissement régulier à propos des notifications</string>

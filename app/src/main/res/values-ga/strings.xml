@@ -628,7 +628,6 @@
     <string name="nc_shared_location">Suíomh roinnte</string>
     <string name="nc_shortcut_conversation_deleted">Níl an comhrá seo ann a thuilleadh</string>
     <string name="nc_shortcut_created">Aicearra cruthaithe</string>
-    <string name="nc_show_ecosystem_description">Moltaí aip Nextcloud i ndialóg roghnóra cuntais</string>
     <string name="nc_show_ecosystem_title">Taispeáin athróir aip</string>
     <string name="nc_show_notification_warning_description">Nuair nach bhfuil fógraí socraithe i gceart, taispeáin rabhadh rialta</string>
     <string name="nc_show_notification_warning_title">Taispeáin rabhadh fógra rialta</string>
