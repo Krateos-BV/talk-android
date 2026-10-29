@@ -12,7 +12,9 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageInfo
+import com.nextcloud.talk.R
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,11 +29,12 @@ class XeniaEcosystemLauncherTest {
 
     private lateinit var activity: Activity
     private lateinit var launcher: XeniaEcosystemLauncher
+    private val shownMessages = mutableListOf<Int>()
 
     @Before
     fun setUp() {
         activity = Robolectric.buildActivity(Activity::class.java).setup().get()
-        launcher = XeniaEcosystemLauncher(activity)
+        launcher = XeniaEcosystemLauncher(activity) { shownMessages += it }
     }
 
     @Test
@@ -53,6 +56,16 @@ class XeniaEcosystemLauncherTest {
         launcher.openApp(XeniaEcosystemApp.NOTES, ACCOUNT)
 
         assertEquals("eu.xeniacloud.notes", shadowOf(activity).nextStartedActivity.`package`)
+    }
+
+    @Test
+    fun showsNotInstalledWhenOnlyUpstreamFilesIsInstalled() {
+        install("com.nextcloud.client")
+
+        launcher.openApp(XeniaEcosystemApp.FILES, ACCOUNT)
+
+        assertNull(shadowOf(activity).nextStartedActivity)
+        assertEquals(listOf(R.string.xenia_ecosystem_app_not_installed), shownMessages)
     }
 
     private fun install(packageName: String) {
