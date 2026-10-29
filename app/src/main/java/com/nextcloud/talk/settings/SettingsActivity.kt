@@ -251,7 +251,6 @@ class SettingsActivity :
         }
 
         setupCheckables(isOnline.value)
-        setupEcosystemSetting()
         setupScreenLockSetting()
         setupNotificationSettings()
         setupProxyTypeSettings()
@@ -285,14 +284,6 @@ class SettingsActivity :
 
         if (openedByNotificationWarning) {
             scrollToNotificationCategory()
-        }
-    }
-
-    private fun setupEcosystemSetting() {
-        if (getResources().getBoolean(R.bool.is_branded_client)) {
-            binding.settingsShowEcosystem.visibility = View.GONE
-        } else {
-            binding.settingsShowEcosystem.visibility = View.VISIBLE
         }
     }
 

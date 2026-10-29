@@ -24,8 +24,6 @@
     <bool name="multiaccount_support">true</bool>
     <string name="weblogin_url" translatable="false">https://portal.xeniacloud.eu</string>
     <string name="nc_report_email" translatable="false">support@xeniacloud.eu</string>
-    <!-- Flags to auto enable/disable some features -->
-    <bool name="is_branded_client">true</bool>
 
     <!-- Will not be shown if empty -->
     <string name="nc_privacy_url" translatable="false">https://xeniacloud.eu/privacy-statement-eu/</string>
