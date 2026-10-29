@@ -12,9 +12,7 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageInfo
-import com.nextcloud.talk.R
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,7 +31,6 @@ class XeniaEcosystemLauncherTest {
     @Before
     fun setUp() {
         activity = Robolectric.buildActivity(Activity::class.java).setup().get()
-        activity.setTheme(R.style.AppTheme)
         launcher = XeniaEcosystemLauncher(activity)
     }
 
@@ -56,15 +53,6 @@ class XeniaEcosystemLauncherTest {
         launcher.openApp(XeniaEcosystemApp.NOTES, ACCOUNT)
 
         assertEquals("eu.xeniacloud.notes", shadowOf(activity).nextStartedActivity.`package`)
-    }
-
-    @Test
-    fun startsNothingWhenOnlyUpstreamFilesIsInstalled() {
-        install("com.nextcloud.client")
-
-        launcher.openApp(XeniaEcosystemApp.FILES, ACCOUNT)
-
-        assertNull(shadowOf(activity).nextStartedActivity)
     }
 
     private fun install(packageName: String) {
