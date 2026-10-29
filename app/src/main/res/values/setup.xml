@@ -35,8 +35,8 @@
     <string name="nc_providers_url" translatable="false"></string>
 
     <!-- Package name from which to import accounts - if empty, won't ever be shown -->
-    <string name="nc_import_accounts_from" translatable="false">com.nextcloud.client</string>
-    <string name="nc_import_account_type" translatable="false">nextcloud</string>
+    <string name="nc_import_accounts_from" translatable="false">eu.xeniacloud.files</string>
+    <string name="nc_import_account_type" translatable="false">xeniacloud</string>
 
     <!-- Push notifications. -->
     <!-- Find the keys in FirebaseOptions.java -->
