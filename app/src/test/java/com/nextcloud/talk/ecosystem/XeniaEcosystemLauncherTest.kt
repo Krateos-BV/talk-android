@@ -6,12 +6,12 @@
  */
 package com.nextcloud.talk.ecosystem
 
+import android.app.Activity
 import android.app.Application
 import android.content.ComponentName
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageInfo
-import androidx.appcompat.app.AppCompatActivity
 import com.nextcloud.talk.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -27,14 +27,13 @@ import org.robolectric.annotation.Config
 @Config(application = Application::class, sdk = [33])
 class XeniaEcosystemLauncherTest {
 
-    private lateinit var activity: AppCompatActivity
+    private lateinit var activity: Activity
     private lateinit var launcher: XeniaEcosystemLauncher
 
     @Before
     fun setUp() {
-        val controller = Robolectric.buildActivity(AppCompatActivity::class.java)
-        activity = controller.get().apply { setTheme(R.style.AppTheme) }
-        controller.setup()
+        activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        activity.setTheme(R.style.AppTheme)
         launcher = XeniaEcosystemLauncher(activity)
     }
 
