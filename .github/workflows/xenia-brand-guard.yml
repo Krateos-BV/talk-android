@@ -34,3 +34,31 @@ jobs:
 
       - name: Check user-visible strings for the upstream brand
         run: python3 scripts/xenia/brand_strings.py --check
+
+  merged-strings:
+    name: merged-strings
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: "temurin"
+          java-version: 21
+
+      - name: Gradle validate
+        uses: gradle/actions/wrapper-validation@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      - name: Merge resources of the release flavor
+        run: ./gradlew --no-daemon :app:mergeGplayDebugResources
+
+      - name: Check merged resources, library strings included, for the upstream brand
+        run: >-
+          python3 scripts/xenia/brand_strings.py --merged
+          app/build/intermediates/incremental/gplayDebug/mergeGplayDebugResources/merged.dir

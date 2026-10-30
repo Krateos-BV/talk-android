@@ -249,7 +249,7 @@ class ConversationsListActivity : BaseActivity() {
             credentials = credentials ?: "",
             showLogo = BrandingUtils.isOriginalNextcloudClient(applicationContext),
             viewThemeUtils = viewThemeUtils,
-            isShowEcosystem = appPreferences.isShowEcosystem && !resources.getBoolean(R.bool.is_branded_client),
+            isShowEcosystem = appPreferences.isShowEcosystem,
             snackbarHostState = snackbarHostState,
             isMaintenanceModeFlow = isMaintenanceModeState,
             isOnlineFlow = networkMonitor.isOnline,
