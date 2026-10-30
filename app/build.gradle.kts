@@ -231,7 +231,6 @@ dependencies {
     implementation("androidx.preference:preference-ktx:1.2.1")
     implementation("androidx.datastore:datastore-core:1.2.1")
     implementation("androidx.datastore:datastore-preferences:1.2.1")
-    implementation("androidx.test.ext:junit-ktx:1.3.0")
 
     implementation(fileTree(mapOf("include" to listOf("*"), "dir" to "libs")))
 
@@ -387,11 +386,13 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito:mockito-core:5.22.0")
     testImplementation("androidx.arch.core:core-testing:2.2.0")
+    testImplementation("androidx.test.ext:junit-ktx:1.3.0")
 
     androidTestImplementation("androidx.test:core:1.7.0")
 
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     androidTestImplementation("androidx.test:core-ktx:1.7.0")
+    androidTestImplementation("androidx.test.ext:junit-ktx:1.3.0")
     androidTestImplementation("org.mockito:mockito-android:5.22.0")
     androidTestImplementation("androidx.work:work-testing:$workVersion")
     androidTestImplementation("androidx.test.espresso:espresso-core:$espressoVersion") {
