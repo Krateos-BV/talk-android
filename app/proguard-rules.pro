@@ -54,3 +54,4 @@
 -dontwarn com.google.common.base.Objects$ToStringHelper
 -dontwarn org.joda.convert.**
 -dontwarn org.slf4j.impl.StaticLoggerBinder
+-dontwarn com.google.firebase.analytics.connector.**
