@@ -25,3 +25,27 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+-keepattributes Signature, InnerClasses, EnclosingMethod, *Annotation*, SourceFile, LineNumberTable
+-renamesourcefileattribute SourceFile
+
+# Models are persisted as JSON in the Room database and preferences, so field names must survive an
+# upgrade from a non-minified build.
+-keepclassmembers class com.nextcloud.talk.** { <fields>; <init>(...); }
+
+# LoganSquare finds a model's mapper by appending $$JsonObjectMapper to the model's class name.
+-keep @com.bluelinelabs.logansquare.annotation.JsonObject class *
+-keep class **$$JsonObjectMapper { *; }
+
+# Parceler finds the generated wrapper by appending $$Parcelable to the model's class name.
+-keep @org.parceler.Parcel class *
+-keep class **$$Parcelable { *; }
+
+-keep class org.webrtc.** { *; }
+-keep class net.zetetic.** { *; }
+
+# WorkManager stores worker class names; jobs queued before an upgrade must still resolve.
+-keep class * extends androidx.work.ListenableWorker { <init>(...); }
+
+-keepclassmembers class * { @org.greenrobot.eventbus.Subscribe <methods>; }
+-keep enum org.greenrobot.eventbus.ThreadMode { *; }
