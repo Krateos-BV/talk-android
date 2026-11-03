@@ -129,7 +129,7 @@ class ServerSelectionActivity : BaseActivity() {
         binding.serverEntryTextInputEditText.requestFocus()
         if (!TextUtils.isEmpty(resources!!.getString(R.string.weblogin_url))) {
             binding.serverEntryTextInputEditText.setText(resources!!.getString(R.string.weblogin_url))
-            checkServerAndProceed()
+            if (!isImportAccountNameSet() || availableAccounts.isEmpty()) checkServerAndProceed()
         }
         binding.serverEntryTextInputEditText.setOnEditorActionListener { _: TextView?, i: Int, _: KeyEvent? ->
             if (i == EditorInfo.IME_ACTION_DONE) {

@@ -390,6 +390,8 @@
     </application>
 
     <queries>
+        <package android:name="eu.xeniacloud.files" />
+        <package android:name="eu.xeniacloud.notes" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:mimeType="*/*" />

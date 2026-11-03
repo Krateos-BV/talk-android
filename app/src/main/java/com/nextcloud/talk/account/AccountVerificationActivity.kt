@@ -172,7 +172,7 @@ class AccountVerificationActivity : BaseActivity() {
         try {
             ncApiCoroutines.getServerStatus(queryUrl)
             baseUrl = "https://$baseUrl"
-            if (isAccountImport) {
+            if (isAccountImport && token.isNullOrEmpty()) {
                 val bundle = Bundle()
                 bundle.putString(KEY_BASE_URL, baseUrl)
                 bundle.putString(KEY_USERNAME, username)

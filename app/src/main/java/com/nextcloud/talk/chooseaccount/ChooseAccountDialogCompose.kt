@@ -68,8 +68,6 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import autodagger.AutoInjector
 import coil.compose.AsyncImage
-import com.nextcloud.android.common.core.utils.ecosystem.EcosystemApp
-import com.nextcloud.android.common.core.utils.ecosystem.EcosystemManager
 import com.nextcloud.android.common.core.utils.ecosystem.LinkHelper
 import com.nextcloud.talk.R
 import com.nextcloud.talk.account.ServerSelectionActivity
@@ -84,6 +82,8 @@ import com.nextcloud.talk.contacts.loadImage
 import com.nextcloud.talk.conversationlist.ConversationsListActivity
 import com.nextcloud.talk.data.network.NetworkMonitor
 import com.nextcloud.talk.data.user.model.User
+import com.nextcloud.talk.ecosystem.XeniaEcosystemApp
+import com.nextcloud.talk.ecosystem.XeniaEcosystemLauncher
 import com.nextcloud.talk.invitation.viewmodels.InvitationsViewModel
 import com.nextcloud.talk.models.json.status.StatusDto
 import com.nextcloud.talk.models.json.status.StatusType
@@ -130,7 +130,7 @@ class ChooseAccountDialogCompose {
     @Inject
     lateinit var networkMonitor: NetworkMonitor
 
-    lateinit var ecosystemManager: EcosystemManager
+    lateinit var ecosystemLauncher: XeniaEcosystemLauncher
 
     private val userItems = mutableStateListOf<AccountItem>()
 
@@ -148,7 +148,7 @@ class ChooseAccountDialogCompose {
         val isOnline by networkMonitor.isOnline.collectAsStateWithLifecycle()
         val currentUser = currentUserProvider.currentUser.blockingGet()!!
         val isStatusAvailable = CapabilitiesUtil.isUserStatusAvailable(currentUser)
-        ecosystemManager = EcosystemManager(activity)
+        ecosystemLauncher = XeniaEcosystemLauncher(activity)
 
         LaunchedEffect(currentUser) {
             val users = userManager.getUsers()
@@ -275,11 +275,11 @@ class ChooseAccountDialogCompose {
     }
 
     private fun openEcosystemFiles(currentUser: User) {
-        ecosystemManager.openApp(EcosystemApp.FILES, getAccountHandle(currentUser))
+        ecosystemLauncher.openApp(XeniaEcosystemApp.FILES, getAccountHandle(currentUser))
     }
 
     private fun openEcosystemNotes(currentUser: User) {
-        ecosystemManager.openApp(EcosystemApp.NOTES, getAccountHandle(currentUser))
+        ecosystemLauncher.openApp(XeniaEcosystemApp.NOTES, getAccountHandle(currentUser))
     }
 
     private fun getAccountHandle(user: User): String = user.username + "@" + user.baseUrl?.toUri()?.host
