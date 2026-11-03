@@ -5,5 +5,3 @@ firebase_database_url  # Firebase project of the push proxy, XEN-120/XEN-122
 google_storage_bucket  # Firebase project of the push proxy, XEN-120/XEN-122
 project_id  # Firebase project of the push proxy, XEN-120/XEN-122
 osm_geocoder_contact  # sent to Nominatim, not shown; XEN-287 F-12
-nc_import_accounts_from  # package of the account app; switching to Xenia Files is a behaviour change tracked on XEN-287
-nc_import_account_type  # account type of the account app; switching to Xenia Files is a behaviour change tracked on XEN-287
