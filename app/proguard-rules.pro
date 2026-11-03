@@ -49,3 +49,8 @@
 
 -keepclassmembers class * { @org.greenrobot.eventbus.Subscribe <methods>; }
 -keep enum org.greenrobot.eventbus.ThreadMode { *; }
+
+# Compile-time references to optional or older library APIs that are not shipped in this app.
+-dontwarn com.google.common.base.Objects$ToStringHelper
+-dontwarn org.joda.convert.**
+-dontwarn org.slf4j.impl.StaticLoggerBinder
