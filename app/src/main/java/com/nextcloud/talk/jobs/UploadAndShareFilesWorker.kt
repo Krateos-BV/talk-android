@@ -49,8 +49,10 @@ import com.nextcloud.talk.utils.FileUtils
 import com.nextcloud.talk.utils.ImageCompressor
 import com.nextcloud.talk.utils.NotificationUtils
 import com.nextcloud.talk.utils.RemoteFileUtils
+import com.nextcloud.talk.utils.SharedFileCopies
+import com.nextcloud.talk.utils.UploadSourceGrants
 import com.nextcloud.talk.utils.VideoCompressor
-import com.nextcloud.talk.utils.database.user.CurrentUserProviderOld
+import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_INTERNAL_USER_ID
 import com.nextcloud.talk.utils.permissions.PlatformPermissionUtil
 import com.nextcloud.talk.utils.preferences.AppPreferences
 import io.reactivex.Observable
@@ -58,7 +60,6 @@ import io.reactivex.disposables.Disposable
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -86,9 +87,6 @@ class UploadAndShareFilesWorker(val context: Context, workerParameters: WorkerPa
     lateinit var ncApiCoroutines: NcApiCoroutines
 
     @Inject
-    lateinit var currentUserProvider: CurrentUserProviderOld
-
-    @Inject
     lateinit var appPreferences: AppPreferences
 
     @Inject
@@ -102,7 +100,9 @@ class UploadAndShareFilesWorker(val context: Context, workerParameters: WorkerPa
 
     lateinit var fileName: String
 
-    private var mNotifyManager: NotificationManager? = null
+    private val notificationManager by lazy {
+        context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    }
 
     lateinit var roomToken: String
     lateinit var conversationName: String
@@ -125,10 +125,17 @@ class UploadAndShareFilesWorker(val context: Context, workerParameters: WorkerPa
     private fun isCancelled(): Boolean = referenceId?.let { cancelledReferenceIds.contains(it) } == true
 
     override fun doWork(): Result {
-        NextcloudTalkApplication.sharedApplication!!.componentApplication.inject(this)
+        // Invariant: dependencies that are already set (a test worker factory) are not overwritten.
+        if (!::chatDao.isInitialized) {
+            NextcloudTalkApplication.sharedApplication!!.componentApplication.inject(this)
+        }
 
         try {
-            return doUpload()
+            return doUpload().also { result ->
+                // not for a retry, which reads the file again
+                val sourceFile = inputData.getString(DEVICE_SOURCE_FILE)
+                if (result != Result.retry() && sourceFile != null) UploadSourceGrants.release(context, sourceFile, id)
+            }
         } finally {
             referenceId?.let { cancelledReferenceIds.remove(it) }
         }
@@ -142,15 +149,21 @@ class UploadAndShareFilesWorker(val context: Context, workerParameters: WorkerPa
     )
     private fun doUpload(): Result {
         return try {
-            currentUser = currentUserProvider.currentUser.blockingGet()
+            // Read first, so a failure below can still mark the placeholder message as failed.
+            referenceId = inputData.getString(KEY_REFERENCE_ID)
+            internalConversationId = inputData.getString(KEY_INTERNAL_CONVERSATION_ID)
+
+            val userId = inputData.getLong(KEY_INTERNAL_USER_ID, 0L)
+            currentUser = runBlocking { userManager.getUserWithId(userId) } ?: run {
+                // E.g. the account was removed while the upload waited for a retry.
+                Log.e(TAG, "No user found for id $userId")
+                return failUpload()
+            }
             val sourceFile = inputData.getString(DEVICE_SOURCE_FILE)
             roomToken = inputData.getString(ROOM_TOKEN)!!
             conversationName = inputData.getString(CONVERSATION_NAME)!!
             val metaData = inputData.getString(META_DATA)
-            referenceId = inputData.getString(KEY_REFERENCE_ID)
-            internalConversationId = inputData.getString(KEY_INTERNAL_CONVERSATION_ID)
 
-            checkNotNull(currentUser)
             checkNotNull(sourceFile)
             require(sourceFile.isNotEmpty())
             checkNotNull(roomToken)
@@ -158,8 +171,6 @@ class UploadAndShareFilesWorker(val context: Context, workerParameters: WorkerPa
             var sourceFileUri = sourceFile.toUri()
             fileName = FileUtils.getFileName(sourceFileUri, context)
             file = FileUtils.getFileFromUri(context, sourceFileUri)
-
-            initNotificationSetup()
 
             if (inputData.getBoolean(COMPRESS_IMAGES, false)) {
                 sourceFileUri = compressMediaIfPossible(sourceFileUri)
@@ -225,10 +236,18 @@ class UploadAndShareFilesWorker(val context: Context, workerParameters: WorkerPa
         }
     }
 
+    // Result.success(), not failure(): the failure is recorded on the placeholder row, and a failed work
+    // request would cascade to every upload already queued behind it in the conversation.
+    @Suppress("Detekt.TooGenericExceptionCaught")
     private fun failUpload(): Result {
-        showFailedToUploadNotification()
         updatePlaceholderStatus(SendStatus.FAILED)
-        return Result.failure()
+        try {
+            showFailedToUploadNotification()
+        } catch (e: Exception) {
+            // The failure is recorded already; an exception here must not end the work as failed.
+            Log.e(TAG, "Could not show the upload failed notification", e)
+        }
+        return Result.success()
     }
 
     /**
@@ -417,8 +436,7 @@ class UploadAndShareFilesWorker(val context: Context, workerParameters: WorkerPa
     private fun updatePlaceholderStatus(status: SendStatus) {
         val refId = referenceId ?: return
         val convId = internalConversationId ?: return
-        val entity = runBlocking { chatDao.getTempMessageForConversation(convId, refId, null).firstOrNull() }
-        entity?.let { chatDao.updateChatMessage(it.copy(sendStatus = status)) }
+        chatDao.updateTempMessageSendStatus(convId, refId, status)
     }
 
     override fun onStopped() {
@@ -430,15 +448,11 @@ class UploadAndShareFilesWorker(val context: Context, workerParameters: WorkerPa
         super.onStopped()
     }
 
-    private fun initNotificationSetup() {
-        mNotifyManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-    }
-
     private fun showFailedToUploadNotification() {
         val failureTitle = getResourceString(context, R.string.nc_upload_failed_notification_title)
         val failureText = String.format(
             getResourceString(context, R.string.nc_upload_failed_notification_text),
-            fileName
+            failedFileName()
         )
         val failureNotification = NotificationCompat.Builder(
             context,
@@ -452,8 +466,16 @@ class UploadAndShareFilesWorker(val context: Context, workerParameters: WorkerPa
             .setOngoing(false)
             .build()
 
-        mNotifyManager!!.notify(SystemClock.uptimeMillis().toInt(), failureNotification)
+        notificationManager.notify(SystemClock.uptimeMillis().toInt(), failureNotification)
     }
+
+    // The upload can fail before the file name is known, e.g. when its account does not exist anymore.
+    private fun failedFileName(): String =
+        if (::fileName.isInitialized) {
+            fileName
+        } else {
+            inputData.getString(DEVICE_SOURCE_FILE)?.toUri()?.lastPathSegment.orEmpty()
+        }
 
     private fun getResourceString(context: Context, resourceId: Int): String = context.resources.getString(resourceId)
 
@@ -515,6 +537,7 @@ class UploadAndShareFilesWorker(val context: Context, workerParameters: WorkerPa
 
         @Suppress("LongParameterList")
         fun upload(
+            userId: Long,
             fileUri: String,
             roomToken: String,
             conversationName: String,
@@ -525,6 +548,7 @@ class UploadAndShareFilesWorker(val context: Context, workerParameters: WorkerPa
             allowUpdate: Boolean = false
         ): UUID {
             val data: Data = Data.Builder()
+                .putLong(KEY_INTERNAL_USER_ID, userId)
                 .putString(DEVICE_SOURCE_FILE, fileUri)
                 .putString(ROOM_TOKEN, roomToken)
                 .putString(CONVERSATION_NAME, conversationName)
@@ -546,14 +570,20 @@ class UploadAndShareFilesWorker(val context: Context, workerParameters: WorkerPa
                     WorkRequest.MIN_BACKOFF_MILLIS,
                     TimeUnit.MILLISECONDS
                 )
+                // keeps a copy of a shared file until its upload is done
+                .apply { SharedFileCopies.uploadTagOf(fileUri)?.let { addTag(it) } }
+                // keeps the read access to a picked file until its upload is done
+                .apply { UploadSourceGrants.uploadTagOf(fileUri)?.let { addTag(it) } }
                 .build()
             // Chained per conversation (not enqueueUniqueWork(fileUri, ...), which ran every upload
             // fully independently) so multiple files - whether from one multi-file share or several
             // sends in a row - actually upload and share to the server in the order they were sent,
             // instead of each finishing (and so appearing in chat) whenever its own network calls
-            // happen to complete. APPEND_OR_REPLACE rather than APPEND: if the file ahead in the
-            // queue was cancelled or failed, this starts a fresh chain instead of cascading that
-            // failure onto every file queued behind it.
+            // happen to complete. APPEND_OR_REPLACE rather than APPEND: if the chain already ended in a
+            // failed or cancelled request, this starts a fresh chain. It does not protect requests that
+            // are already appended behind a request that fails later; that is why a failed upload is
+            // recorded on its row and finishes with Result.success(). Cancelling by id still cancels the
+            // requests behind it.
             WorkManager.getInstance().enqueueUniqueWork(
                 uploadQueueName(internalConversationId),
                 ExistingWorkPolicy.APPEND_OR_REPLACE,
@@ -567,9 +597,11 @@ class UploadAndShareFilesWorker(val context: Context, workerParameters: WorkerPa
         // Cancellation is by the WorkRequest's own id (not enqueueUniqueWork's name) since that name
         // is now shared by every file queued in the same conversation - cancelling by name would
         // cancel the whole queue instead of just this one upload.
-        fun cancelUpload(referenceId: String, workerId: UUID) {
+        fun cancelUpload(referenceId: String, workerId: UUID, fileUri: String?) {
             cancelledReferenceIds.add(referenceId)
             WorkManager.getInstance().cancelWorkById(workerId)
+            // an upload that didn't start doesn't release the read access to its file itself
+            fileUri?.let { UploadSourceGrants.releaseLater(it, exceptWorkId = workerId) }
         }
     }
 }

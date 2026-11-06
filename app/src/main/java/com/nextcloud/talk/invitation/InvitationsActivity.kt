@@ -9,7 +9,6 @@ package com.nextcloud.talk.invitation
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
-import androidx.activity.OnBackPressedCallback
 import androidx.core.graphics.drawable.toDrawable
 import androidx.lifecycle.ViewModelProvider
 import autodagger.AutoInjector
@@ -19,14 +18,12 @@ import com.nextcloud.talk.activities.BaseActivity
 import com.nextcloud.talk.api.NcApi
 import com.nextcloud.talk.application.NextcloudTalkApplication
 import com.nextcloud.talk.chat.ChatActivity
-import com.nextcloud.talk.conversationlist.ConversationsListActivity
 import com.nextcloud.talk.data.user.model.User
 import com.nextcloud.talk.databinding.ActivityInvitationsBinding
 import com.nextcloud.talk.invitation.adapters.InvitationsAdapter
 import com.nextcloud.talk.invitation.data.ActionEnum
 import com.nextcloud.talk.invitation.data.Invitation
 import com.nextcloud.talk.invitation.viewmodels.InvitationsViewModel
-import com.nextcloud.talk.utils.bundle.BundleKeys
 import javax.inject.Inject
 
 @AutoInjector(NextcloudTalkApplication::class)
@@ -46,20 +43,13 @@ class InvitationsActivity : BaseActivity() {
 
     private lateinit var currentUser: User
 
-    private val onBackPressedCallback = object : OnBackPressedCallback(true) {
-        override fun handleOnBackPressed() {
-            val intent = Intent(this@InvitationsActivity, ConversationsListActivity::class.java)
-            startActivity(intent)
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         NextcloudTalkApplication.sharedApplication!!.componentApplication.inject(this)
+        currentUser = setUpBoundUserOrFinish() ?: return
 
         invitationsViewModel = ViewModelProvider(this, viewModelFactory)[InvitationsViewModel::class.java]
 
-        currentUser = currentUserProviderOld.currentUser.blockingGet()
         invitationsViewModel.fetchInvitations(currentUser)
 
         binding = ActivityInvitationsBinding.inflate(layoutInflater)
@@ -74,8 +64,6 @@ class InvitationsActivity : BaseActivity() {
         binding.invitationsRecyclerView.adapter = adapter
 
         initObservers()
-
-        onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
     }
 
     enum class InvitationAction {
@@ -136,12 +124,11 @@ class InvitationsActivity : BaseActivity() {
 
                 is InvitationsViewModel.InvitationActionSuccessState -> {
                     if (state.action == ActionEnum.ACCEPT) {
-                        val bundle = Bundle()
-                        bundle.putString(BundleKeys.KEY_ROOM_TOKEN, state.invitation.localToken)
-                        val chatIntent = Intent(context, ChatActivity::class.java)
-                        chatIntent.putExtras(bundle)
-                        chatIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                        startActivity(chatIntent)
+                        state.invitation.localToken?.let { token ->
+                            val chatIntent = ChatActivity.createIntent(context, currentUser.id!!, token)
+                            chatIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            startActivity(chatIntent)
+                        }
                     } else {
                         // adapter.currentList.remove(state.invitation)
                         // adapter.notifyDataSetChanged()  // leads to UnsupportedOperationException ?!

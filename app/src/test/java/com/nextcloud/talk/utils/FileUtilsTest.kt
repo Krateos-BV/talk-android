@@ -132,6 +132,19 @@ class FileUtilsTest {
     }
 
     @Test
+    fun resolveSharedAttachmentFile_withoutFileId_resolvesInsideDedicatedSubDirectory() {
+        val baseDir = createTempDir()
+        try {
+            val expected = File(baseDir, "shared_attachments/example.pdf").canonicalPath
+
+            assertEquals(expected, FileUtils.resolveSharedAttachmentFile(baseDir, null, "example.pdf")?.canonicalPath)
+            assertEquals(expected, FileUtils.resolveSharedAttachmentFile(baseDir, "", "example.pdf")?.canonicalPath)
+        } finally {
+            baseDir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun resolveSharedAttachmentFile_withFileId_keepsDifferentFileIdsFromColliding() {
         val baseDir = createTempDir()
         try {
@@ -167,6 +180,56 @@ class FileUtilsTest {
             val result = FileUtils.getSharedAttachmentsDirectory(baseDir)
 
             assertNull(result)
+        } finally {
+            baseDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun sharedAttachmentProviderFile_resolvesFileInSharedAttachments() {
+        val baseDir = createTempDir()
+        try {
+            val sharedAttachments = File(baseDir, "shared_attachments").canonicalFile
+            assertEquals(
+                File(sharedAttachments, "image.jpg"),
+                FileUtils.sharedAttachmentProviderFile(baseDir, baseDir, listOf("shared_attachments", "image.jpg"))
+            )
+            assertEquals(
+                File(sharedAttachments, "42/image.jpg"),
+                FileUtils.sharedAttachmentProviderFile(
+                    baseDir,
+                    baseDir,
+                    listOf("shared_attachments", "42", "image.jpg")
+                )
+            )
+        } finally {
+            baseDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun sharedAttachmentProviderFile_rejectsOtherProviderPaths() {
+        val baseDir = createTempDir()
+        try {
+            assertNull(FileUtils.sharedAttachmentProviderFile(baseDir, baseDir, listOf("logs", "log.txt")))
+            assertNull(FileUtils.sharedAttachmentProviderFile(baseDir, baseDir, listOf("photos", "photo.jpg")))
+            assertNull(FileUtils.sharedAttachmentProviderFile(baseDir, baseDir, listOf("shared_attachments")))
+            assertNull(FileUtils.sharedAttachmentProviderFile(baseDir, baseDir, emptyList()))
+        } finally {
+            baseDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun sharedAttachmentProviderFile_rejectsTraversal() {
+        val baseDir = createTempDir()
+        try {
+            val traversals = listOf(
+                listOf("shared_attachments", "..", "secret.db"),
+                listOf("shared_attachments", "../secret.db"),
+                listOf("shared_file_copies", "..", "secret.db")
+            )
+            traversals.forEach { assertNull(FileUtils.sharedAttachmentProviderFile(baseDir, baseDir, it)) }
         } finally {
             baseDir.deleteRecursively()
         }

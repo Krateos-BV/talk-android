@@ -80,6 +80,14 @@ interface ChatMessageRepository : LifecycleAwareManager {
     suspend fun updateLocalReadState(lastReadMessage: Int)
 
     /**
+     * Like [updateLocalReadState], but for a marker that cannot be sent yet (an own message is still on its
+     * way): only the unread count of the conversation entry is lowered, the stored read marker stays the
+     * one the server knows and no pending marker is registered. So the server stays the authority for the
+     * read state, and the marker is still sent as soon as the own message is confirmed or failed.
+     */
+    suspend fun updateLocalUnreadCountOnly(lastReadMessage: Int)
+
+    /**
      * Writes the local read state for a message the user marked as unread: the read marker moves back
      * to [lastReadMessage] and the conversation keeps at least one unread message until the server
      * reports its own unread state.
@@ -144,6 +152,14 @@ interface ChatMessageRepository : LifecycleAwareManager {
      */
     suspend fun markMessageForResend(referenceId: String): Flow<Result<ChatMessage?>>
 
+    /**
+     * Marks the PENDING text messages of this conversation created before [createdBefore] (epoch
+     * seconds) as FAILED, so the user can resend or delete them. Call only when no SendMessageWorker
+     * work is left for the conversation: such a message would otherwise stay PENDING forever.
+     * Returns the number of messages changed.
+     */
+    suspend fun failPendingMessagesWithoutSendWork(createdBefore: Long): Int
+
     suspend fun addTemporaryMessage(
         message: CharSequence,
         displayName: String,
@@ -168,6 +184,12 @@ interface ChatMessageRepository : LifecycleAwareManager {
      * the time this is called, so a late cancel can't hide an already-sent message.
      */
     suspend fun deleteTempMessageByReferenceId(referenceId: String): Boolean
+
+    /**
+     * Marks the upload placeholder for [referenceId] as failed, but only while it's still PENDING.
+     * Does nothing if there is no such placeholder (yet).
+     */
+    suspend fun markUploadPlaceholderFailed(referenceId: String)
 
     /**
      * Writes the new text into the local database before the server is asked, so the chat renders the

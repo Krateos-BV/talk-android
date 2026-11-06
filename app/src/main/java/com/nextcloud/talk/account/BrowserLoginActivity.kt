@@ -13,9 +13,12 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.viewModels
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import autodagger.AutoInjector
@@ -24,10 +27,10 @@ import com.nextcloud.talk.R
 import com.nextcloud.talk.account.data.LoginRepository
 import com.nextcloud.talk.account.viewmodels.BrowserLoginActivityViewModel
 import com.nextcloud.talk.activities.BaseActivity
-import com.nextcloud.talk.activities.MainActivity
 import com.nextcloud.talk.application.NextcloudTalkApplication
 import com.nextcloud.talk.application.NextcloudTalkApplication.Companion.sharedApplication
 import com.nextcloud.talk.databinding.ActivityWebViewLoginBinding
+import com.nextcloud.talk.utils.AppTasks
 import com.nextcloud.talk.utils.bundle.BundleKeys
 import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_BASE_URL
 import kotlinx.coroutines.launch
@@ -39,14 +42,14 @@ class BrowserLoginActivity : BaseActivity() {
     private lateinit var binding: ActivityWebViewLoginBinding
 
     @Inject
-    lateinit var viewModel: BrowserLoginActivityViewModel
+    lateinit var viewModelFactory: ViewModelProvider.Factory
+
+    private val viewModel: BrowserLoginActivityViewModel by viewModels { viewModelFactory }
 
     private var reauthorizeAccount = false
     private val onBackPressedCallback = object : OnBackPressedCallback(true) {
         override fun handleOnBackPressed() {
-            val intent = Intent(context, MainActivity::class.java)
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            startActivity(intent)
+            startActivity(AppTasks.createRestartIntent(context))
         }
     }
 
@@ -108,8 +111,27 @@ class BrowserLoginActivity : BaseActivity() {
                             logger.e(TAG, "Post login step failed")
                             Snackbar.make(binding.root, R.string.nc_common_error_sorry, Snackbar.LENGTH_SHORT).show()
                         }
+                        BrowserLoginActivityViewModel.PostLoginViewState.PostLoginTooManyLoginAttempts -> {
+                            logger.e(TAG, "Login refused because of too many failed logins")
+                            Snackbar.make(binding.root, R.string.nc_login_too_many_attempts, Snackbar.LENGTH_LONG)
+                                .show()
+                        }
+                        BrowserLoginActivityViewModel.PostLoginViewState.PostLoginRemovalPending -> {
+                            logger.e(TAG, "Account removal did not finish in time")
+                            // This login can't be retried here. Back on the previous screen, it can be started again,
+                            // so the message must outlive this activity.
+                            Toast.makeText(context, R.string.nc_account_removal_pending, Toast.LENGTH_LONG).show()
+                            finish()
+                        }
                         BrowserLoginActivityViewModel.PostLoginViewState.PostLoginRestartApp -> {
                             restartApp()
+                        }
+                        BrowserLoginActivityViewModel.PostLoginViewState.PostLoginDifferentAccount -> {
+                            // This login can't be used anymore. Back on the previous screen, the reauthorization can
+                            // be started again, so the message must outlive this activity.
+                            Toast.makeText(context, R.string.nc_reauthorize_different_account, Toast.LENGTH_LONG)
+                                .show()
+                            finish()
                         }
                     }
                 }
@@ -124,17 +146,19 @@ class BrowserLoginActivity : BaseActivity() {
         if (extras.containsKey(BundleKeys.KEY_REAUTHORIZE_ACCOUNT)) {
             reauthorizeAccount = extras.getBoolean(BundleKeys.KEY_REAUTHORIZE_ACCOUNT)
         }
+        // The account to reauthorize, so a login with another account doesn't change it.
+        val accountToReauthorize = extras.getLong(BundleKeys.KEY_INTERNAL_USER_ID, 0L).takeIf { it != 0L }
 
         if (extras.containsKey(BundleKeys.KEY_FROM_QR)) {
             val uri = extras.getString(BundleKeys.KEY_FROM_QR)!!
 
             if (uri.startsWith(LoginRepository.ONE_TIME_PREFIX)) {
-                viewModel.loginWithOTPQR(uri, reauthorizeAccount)
+                viewModel.loginWithOTPQR(uri, reauthorizeAccount, accountToReauthorize)
             } else {
-                viewModel.loginWithQR(uri, reauthorizeAccount)
+                viewModel.loginWithQR(uri, reauthorizeAccount, accountToReauthorize)
             }
         } else if (baseUrl != null) {
-            viewModel.startWebBrowserLogin(baseUrl, reauthorizeAccount)
+            viewModel.startWebBrowserLogin(baseUrl, reauthorizeAccount, accountToReauthorize)
         }
     }
 
@@ -161,9 +185,7 @@ class BrowserLoginActivity : BaseActivity() {
     }
 
     private fun restartApp() {
-        val intent = Intent(context, MainActivity::class.java)
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        startActivity(intent)
+        startActivity(AppTasks.createRestartIntent(context))
     }
 
     public override fun onDestroy() {

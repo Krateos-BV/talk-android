@@ -44,4 +44,30 @@ class UriUtilsTest {
         Assert.assertNull(UriUtils.toSecureServerUrl("http://cloud.example.com"))
         Assert.assertNull(UriUtils.toSecureServerUrl("HTTP://cloud.example.com"))
     }
+
+    @Test
+    fun `isOnServer accepts URLs of the server`() {
+        Assert.assertTrue(UriUtils.isOnServer("$SERVER/core/preview?x=1", SERVER))
+        Assert.assertTrue(UriUtils.isOnServer("$SERVER/", "$SERVER/"))
+        Assert.assertTrue(UriUtils.isOnServer("$SUBFOLDER_SERVER/index.php", SUBFOLDER_SERVER))
+    }
+
+    @Test
+    fun `isOnServer rejects other hosts that start with the server`() {
+        Assert.assertFalse(UriUtils.isOnServer("https://cloud.example.com.attacker.test/image", SERVER))
+        Assert.assertFalse(UriUtils.isOnServer("https://cloud.example.com@attacker.test/image", SERVER))
+    }
+
+    @Test
+    fun `isOnServer rejects another scheme, port or path`() {
+        Assert.assertFalse(UriUtils.isOnServer("http://cloud.example.com/image", SERVER))
+        Assert.assertFalse(UriUtils.isOnServer("https://cloud.example.com:8443/image", SERVER))
+        Assert.assertFalse(UriUtils.isOnServer("${SUBFOLDER_SERVER}2/image", SUBFOLDER_SERVER))
+        Assert.assertFalse(UriUtils.isOnServer("not a url", SERVER))
+    }
+
+    companion object {
+        private const val SERVER = "https://cloud.example.com"
+        private const val SUBFOLDER_SERVER = "https://example.com/nextcloud"
+    }
 }
