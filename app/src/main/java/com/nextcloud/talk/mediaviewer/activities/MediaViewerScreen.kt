@@ -6,6 +6,7 @@
  */
 package com.nextcloud.talk.mediaviewer.activities
 
+import android.graphics.drawable.Animatable
 import android.graphics.drawable.Drawable
 import android.util.Log
 import android.view.View
@@ -61,6 +62,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -89,11 +91,10 @@ import com.nextcloud.talk.utils.DateConstants
 import com.nextcloud.talk.utils.DateUtils
 import com.nextcloud.talk.utils.DrawableUtils
 import com.nextcloud.talk.utils.Mimetype
-import com.nextcloud.talk.utils.MimetypeUtils
+import com.nextcloud.talk.ui.LocalImageAuthHeader
+import com.nextcloud.talk.ui.withAuthHeader
 import java.io.File
 import kotlinx.coroutines.launch
-import pl.droidsonroids.gif.GifDrawable
-import pl.droidsonroids.gif.GifImageView
 
 private const val TOOLBAR_ALPHA = 0.6f
 private const val MAX_SCALE = 6.0f
@@ -306,7 +307,6 @@ private fun MediaPage(
     controllerExtraBottomInsetPx: Int
 ) {
     val isVideo = item.mimeType.startsWith(Mimetype.VIDEO_PREFIX)
-    val isGif = MimetypeUtils.isGif(item.mimeType)
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when {
@@ -320,7 +320,6 @@ private fun MediaPage(
             } else {
                 PreviewPlaceholder(item, onToggleControls = onToggleControls)
             }
-            isGif -> GifPage(localPath = localPath, onToggleControls = onToggleControls)
             else -> ImagePage(localPath = localPath, onToggleControls = onToggleControls)
         }
     }
@@ -330,7 +329,10 @@ private fun MediaPage(
 private fun PreviewPlaceholder(item: MediaViewerItem, onToggleControls: () -> Unit) {
     if (item.previewUrl != null) {
         AsyncImage(
-            model = item.previewUrl,
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(item.previewUrl)
+                .withAuthHeader(LocalImageAuthHeader.current)
+                .build(),
             contentDescription = item.fileName,
             modifier = Modifier.fillMaxSize().clickable(onClick = onToggleControls),
             contentScale = ContentScale.Fit
@@ -339,25 +341,13 @@ private fun PreviewPlaceholder(item: MediaViewerItem, onToggleControls: () -> Un
 }
 
 @Composable
-private fun GifPage(localPath: String, onToggleControls: () -> Unit) {
-    AndroidView(
-        factory = { ctx ->
-            GifImageView(ctx).apply {
-                setImageDrawable(GifDrawable(localPath))
-                setOnClickListener { onToggleControls() }
-            }
-        },
-        modifier = Modifier.fillMaxSize()
-    )
-}
-
-@Composable
 private fun ImagePage(localPath: String, onToggleControls: () -> Unit) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     var drawable by remember(localPath) { mutableStateOf<Drawable?>(null) }
 
     LaunchedEffect(localPath) {
-        val displayMetrics = context.resources.displayMetrics
+        val displayMetrics = resources.displayMetrics
         val request = ImageRequest.Builder(context)
             .data(File(localPath))
             .size(displayMetrics.widthPixels * 2, displayMetrics.heightPixels * 2)
@@ -379,7 +369,14 @@ private fun ImagePage(localPath: String, onToggleControls: () -> Unit) {
                 setOnOutsidePhotoTapListener { onToggleControls() }
             }
         },
-        update = { photoView -> drawable?.let { photoView.setImageDrawable(it) } },
+        update = { photoView ->
+            drawable?.let {
+                photoView.setImageDrawable(it)
+                // Animated images (GIF, animated WebP/HEIF) decoded by Coil are not started automatically
+                (it as? Animatable)?.start()
+            }
+        },
+        onRelease = { photoView -> (photoView.drawable as? Animatable)?.stop() },
         modifier = Modifier.fillMaxSize()
     )
 }
@@ -512,7 +509,10 @@ private fun ThumbnailTile(item: MediaViewerItem, isSelected: Boolean, onClick: (
     ) {
         if (item.previewUrl != null) {
             AsyncImage(
-                model = item.previewUrl,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(item.previewUrl)
+                    .withAuthHeader(LocalImageAuthHeader.current)
+                    .build(),
                 contentDescription = item.fileName,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop

@@ -11,6 +11,7 @@ package com.nextcloud.talk.account
 import android.Manifest
 import android.accounts.Account
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.os.Bundle
@@ -37,7 +38,6 @@ import com.nextcloud.talk.data.network.NetworkMonitor
 import com.nextcloud.talk.databinding.ActivityServerSelectionBinding
 import com.nextcloud.talk.models.json.capabilities.CapabilitiesOverall
 import com.nextcloud.talk.models.json.generic.StatusDto
-import com.nextcloud.talk.users.UserManager
 import com.nextcloud.talk.utils.AccountUtils
 import com.nextcloud.talk.utils.ApiUtils
 import com.nextcloud.talk.utils.CapabilitiesUtil
@@ -62,9 +62,6 @@ class ServerSelectionActivity : BaseActivity() {
 
     @Inject
     lateinit var ncApi: NcApi
-
-    @Inject
-    lateinit var userManager: UserManager
 
     @Inject
     lateinit var networkMonitor: NetworkMonitor
@@ -473,5 +470,18 @@ class ServerSelectionActivity : BaseActivity() {
         private val TAG = ServerSelectionActivity::class.java.simpleName
         const val MIN_SERVER_MAJOR_VERSION = 13
         private const val QR_URI = "com.blikoon.qrcodescanner.got_qr_scan_relult"
+
+        /**
+         * Creates the intent that starts the login: the web login on the server of a branded client, or else the
+         * selection of the server, which also offers to import an account found on the device.
+         */
+        fun createLoginIntent(context: Context): Intent {
+            val brandedServerUrl = context.getString(R.string.weblogin_url)
+            return if (brandedServerUrl.isNotEmpty() && !context.hasDeviceAccountsToImport()) {
+                Intent(context, BrowserLoginActivity::class.java).putExtra(BundleKeys.KEY_BASE_URL, brandedServerUrl)
+            } else {
+                Intent(context, ServerSelectionActivity::class.java)
+            }
+        }
     }
 }

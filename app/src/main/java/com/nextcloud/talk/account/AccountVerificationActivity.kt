@@ -20,6 +20,7 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.lifecycleScope
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequest
+import com.nextcloud.talk.utils.bundle.BundleKeys
 import com.nextcloud.talk.utils.setExpeditedIfSupported
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -77,9 +78,6 @@ class AccountVerificationActivity : BaseActivity() {
 
     @Inject
     lateinit var ncApiCoroutines: NcApiCoroutines
-
-    @Inject
-    lateinit var userManager: UserManager
 
     @Inject
     lateinit var cookieManager: CookieManager
@@ -433,7 +431,8 @@ class AccountVerificationActivity : BaseActivity() {
                 ApplicationWideMessageHolder.getInstance().messageType =
                     ApplicationWideMessageHolder.MessageType.ACCOUNT_WAS_IMPORTED
             }
-            val intent = Intent(context, ConversationsListActivity::class.java)
+            val intent = ConversationsListActivity.createIntent(context)
+            intent.putExtra(BundleKeys.KEY_INTERNAL_USER_ID, userToSetAsActive.id)
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             startActivity(intent)
         } else {

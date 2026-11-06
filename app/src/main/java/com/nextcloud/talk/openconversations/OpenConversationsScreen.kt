@@ -41,7 +41,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.SearchBarState
 import androidx.compose.material3.SnackbarHost
@@ -90,6 +89,8 @@ import com.nextcloud.talk.openconversations.viewmodels.OpenConversationsViewMode
 import com.nextcloud.talk.utils.ApiUtils
 import com.nextcloud.talk.utils.DisplayUtils
 import kotlinx.coroutines.flow.distinctUntilChanged
+import com.nextcloud.talk.ui.withAuthHeader
+import com.nextcloud.talk.ui.LocalImageAuthHeader
 
 private val TAG = ListOpenConversationsActivity::class.java.simpleName
 
@@ -239,39 +240,41 @@ private fun OpenConversationsSearchBar(
     onSearchDismiss: () -> Unit,
     onSearch: () -> Unit
 ) {
-    SearchBar(
-        state = searchBarState,
-        inputField = {
-            SearchBarDefaults.InputField(
-                textFieldState = textFieldState,
-                searchBarState = searchBarState,
-                onSearch = { onSearch() },
-                placeholder = { Text(stringResource(R.string.nc_search)) },
-                leadingIcon = {
-                    IconButton(onClick = onSearchDismiss) {
-                        Icon(
-                            imageVector = ImageVector.vectorResource(R.drawable.ic_chevron_backward_24px),
-                            contentDescription = stringResource(R.string.back_button)
-                        )
-                    }
-                },
-                trailingIcon = {
-                    if (textFieldState.text.isNotEmpty()) {
-                        IconButton(onClick = { textFieldState.setTextAndPlaceCursorAtEnd("") }) {
-                            Icon(
-                                imageVector = ImageVector.vectorResource(R.drawable.ic_close_search),
-                                contentDescription = stringResource(R.string.nc_search_clear)
-                            )
-                        }
-                    }
-                },
-                modifier = Modifier.focusRequester(focusRequester)
-            )
-        },
+    // A Surface instead of SearchBar: the collapsed SearchBar blocks the soft keyboard, as typing is meant to happen in
+    // an expanded search bar, which this screen does not use.
+    Surface(
+        shape = SearchBarDefaults.inputFieldShape,
+        color = SearchBarDefaults.colors().containerColor,
         modifier = Modifier
             .fillMaxWidth()
             .padding(end = 16.dp)
-    )
+    ) {
+        SearchBarDefaults.InputField(
+            textFieldState = textFieldState,
+            searchBarState = searchBarState,
+            onSearch = { onSearch() },
+            placeholder = { Text(stringResource(R.string.nc_search)) },
+            leadingIcon = {
+                IconButton(onClick = onSearchDismiss) {
+                    Icon(
+                        imageVector = ImageVector.vectorResource(R.drawable.ic_chevron_backward_24px),
+                        contentDescription = stringResource(R.string.back_button)
+                    )
+                }
+            },
+            trailingIcon = {
+                if (textFieldState.text.isNotEmpty()) {
+                    IconButton(onClick = { textFieldState.setTextAndPlaceCursorAtEnd("") }) {
+                        Icon(
+                            imageVector = ImageVector.vectorResource(R.drawable.ic_close_search),
+                            contentDescription = stringResource(R.string.nc_search_clear)
+                        )
+                    }
+                }
+            },
+            modifier = Modifier.focusRequester(focusRequester)
+        )
+    }
 }
 
 @Composable
@@ -352,6 +355,7 @@ private fun OpenConversationItem(
     }
     val imageRequest = ImageRequest.Builder(context)
         .data(avatarUrl)
+        .withAuthHeader(LocalImageAuthHeader.current)
         .transformations(CircleCropTransformation())
         .error(errorPlaceholder)
         .placeholder(errorPlaceholder)

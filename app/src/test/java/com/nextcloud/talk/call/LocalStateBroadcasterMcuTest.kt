@@ -39,8 +39,8 @@ class LocalStateBroadcasterMcuTest {
 
     @After
     fun tearDown() {
-        // several tests install a TestScheduler as the global io scheduler; left in place it
-        // starves every later test class in the same JVM that subscribes on Schedulers.io()
+        // The tests swap the global IO scheduler for a TestScheduler; leaking it hangs every
+        // later test that blocks on Schedulers.io()
         RxJavaPlugins.reset()
     }
 

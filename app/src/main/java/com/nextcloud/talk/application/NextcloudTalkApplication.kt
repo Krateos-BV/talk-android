@@ -39,6 +39,7 @@ import com.nextcloud.talk.diagnosis.toMarkdown
 import com.nextcloud.talk.errorhandling.ExceptionHandler
 import com.nextcloud.talk.logger.LoggerImpl
 import com.nextcloud.talk.account.BrowserLoginActivity
+import com.nextcloud.talk.dagger.modules.ApplicationScope
 import com.nextcloud.talk.dagger.modules.BusModule
 import com.nextcloud.talk.dagger.modules.ContextModule
 import com.nextcloud.talk.dagger.modules.DaosModule
@@ -50,6 +51,7 @@ import com.nextcloud.talk.dagger.modules.UtilsModule
 import com.nextcloud.talk.dagger.modules.ViewModelModule
 import com.nextcloud.talk.filebrowser.webdav.DavUtils
 import com.nextcloud.talk.jobs.AccountRemovalWorker
+import com.nextcloud.talk.jobs.ConversationsSyncWorker
 import com.nextcloud.talk.jobs.CapabilitiesSyncWorker
 import com.nextcloud.talk.jobs.SignalingSettingsWorker
 import com.nextcloud.talk.jobs.WebsocketConnectionsWorker
@@ -57,7 +59,10 @@ import com.nextcloud.talk.ui.theme.ThemeModule
 import com.nextcloud.talk.users.UserManager
 import com.nextcloud.talk.utils.ClosedInterfaceImpl
 import com.nextcloud.talk.utils.DeviceUtils
+import com.nextcloud.talk.utils.LiveActivities
 import com.nextcloud.talk.utils.NotificationUtils
+import com.nextcloud.talk.utils.SharedFileCopies
+import com.nextcloud.talk.utils.UploadSourceGrants
 import com.nextcloud.talk.utils.database.arbitrarystorage.ArbitraryStorageModule
 import com.nextcloud.talk.utils.database.user.UserModule
 import com.nextcloud.talk.utils.preferences.AppPreferences
@@ -65,6 +70,8 @@ import de.cotech.hw.SecurityKeyManager
 import de.cotech.hw.SecurityKeyManagerConfig
 import io.reactivex.exceptions.UndeliverableException
 import io.reactivex.plugins.RxJavaPlugins
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import org.conscrypt.Conscrypt
 import org.webrtc.PeerConnectionFactory
@@ -111,6 +118,13 @@ class NextcloudTalkApplication :
 
     @Inject
     lateinit var userManager: UserManager
+
+    @Inject
+    @field:ApplicationScope
+    lateinit var appScope: CoroutineScope
+
+    // the activities of the app, e.g. to finish only those in a task of another app, see LockedActivity
+    val liveActivities = LiveActivities().also { registerActivityLifecycleCallbacks(it) }
 
     @Inject
     lateinit var logger: LoggerImpl
@@ -189,7 +203,8 @@ class NextcloudTalkApplication :
             val activities = packageManager.getPackageInfo(packageName, PackageManager.GET_ACTIVITIES).activities
             activities?.forEach { activityInfo ->
                 try {
-                    val activityClass = Class.forName(activityInfo.name)
+                    // an activity-alias is listed by its own name, which is not a class
+                    val activityClass = Class.forName(activityInfo.targetActivity ?: activityInfo.name)
                     if (activityClass != AccountVerificationActivity::class.java &&
                         activityClass != BrowserLoginActivity::class.java
                     ) {
@@ -214,14 +229,7 @@ class NextcloudTalkApplication :
         componentApplication.inject(this)
         installExceptionHandler()
 
-        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
-            override fun onStop(owner: LifecycleOwner) {
-                val ts = System.currentTimeMillis()
-                Log.d(TAG, "ProcessLifecycle onStop: saving lockTimestamp=$ts")
-                appPreferences.setLockTimestamp(ts)
-                pendingLockCheck = true
-            }
-        })
+        observeAppInBackground()
 
         Coil.setImageLoader(buildDefaultImageLoader())
         setAppTheme(appPreferences.theme)
@@ -240,6 +248,12 @@ class NextcloudTalkApplication :
     }
 
     private fun initWorkers() {
+        appScope.launch { userManager.repairMultipleActiveUsers() }
+        // the copies of shares that are done, also when no new share starts
+        appScope.launch { SharedFileCopies.removeDoneShares(this@NextcloudTalkApplication) }
+        // the read access to picked files whose uploads are done, also one that was cancelled before it started
+        appScope.launch { UploadSourceGrants.releaseUnused(this@NextcloudTalkApplication) }
+
         val accountRemovalWork = OneTimeWorkRequest.Builder(AccountRemovalWorker::class.java).build()
         val capabilitiesUpdateWork = OneTimeWorkRequest.Builder(CapabilitiesSyncWorker::class.java).build()
         val signalingSettingsWork = OneTimeWorkRequest.Builder(SignalingSettingsWorker::class.java).build()
@@ -262,6 +276,8 @@ class NextcloudTalkApplication :
             ExistingPeriodicWorkPolicy.REPLACE,
             periodicCapabilitiesUpdateWork
         )
+
+        ConversationsSyncWorker.schedule(applicationContext)
     }
 
     override fun onTerminate() {
@@ -306,6 +322,22 @@ class NextcloudTalkApplication :
         return imageLoaderBuilder.build()
     }
 
+    /** Checks the app lock when the app is used again after it went to the background. */
+    private fun observeAppInBackground() {
+        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStop(owner: LifecycleOwner) {
+                // While locked, the time of the last use stays, so the app is still locked after its process was
+                // killed, which resets isLocked.
+                if (!isLocked) {
+                    val ts = System.currentTimeMillis()
+                    Log.d(TAG, "ProcessLifecycle onStop: saving lockTimestamp=$ts")
+                    appPreferences.setLockTimestamp(ts)
+                }
+                pendingLockCheck = true
+            }
+        })
+    }
+
     companion object {
         private val TAG = NextcloudTalkApplication::class.java.simpleName
         const val FIFTY_PERCENT = 0.5
@@ -319,6 +351,15 @@ class NextcloudTalkApplication :
 
         @Volatile
         var pendingLockCheck = true
+
+        /**
+         * Whether the app lock is showing or due: set when the lock screen is started, and cleared only by
+         * authenticating in it (or when the app lock can't be used anymore). While it is set, every screen that is
+         * resumed shows the lock screen, even after the lock screen was closed without authenticating, e.g. by a
+         * deep link or a notification that clears the task.
+         */
+        @Volatile
+        var isLocked = false
         //endregion
 
         //region Setters
