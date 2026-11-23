@@ -7,7 +7,6 @@
  */
 package com.nextcloud.talk.chat.viewmodels
 
-import android.app.Activity
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
@@ -15,13 +14,19 @@ import android.provider.OpenableColumns
 import android.util.Log
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
+import androidx.core.net.toUri
+import androidx.core.content.FileProvider
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.google.gson.Gson
+import com.nextcloud.talk.BuildConfig
 import com.nextcloud.talk.R
 import com.nextcloud.talk.application.NextcloudTalkApplication
 import com.nextcloud.talk.arbitrarystorage.ArbitraryStorageManager
@@ -31,6 +36,7 @@ import com.nextcloud.talk.chat.data.io.MediaRecorderManager
 import com.nextcloud.talk.chat.data.model.ChatMessage
 import com.nextcloud.talk.chat.data.model.FileParameters
 import com.nextcloud.talk.chat.data.network.ChatNetworkDataSource
+import com.nextcloud.talk.chat.runProviderCall
 import com.nextcloud.talk.chat.ui.model.ChatMessageUi
 import com.nextcloud.talk.chat.ui.model.MessageStatusIcon
 import com.nextcloud.talk.chat.ui.model.MessageTypeContent
@@ -48,9 +54,6 @@ import com.nextcloud.talk.data.user.model.User
 import com.nextcloud.talk.jobs.ReadMarkerSyncWorker
 import com.nextcloud.talk.jobs.SendMessageWorker
 import com.nextcloud.talk.jobs.ShareOperationWorker
-import androidx.lifecycle.asFlow
-import androidx.work.WorkInfo
-import androidx.work.WorkManager
 import com.nextcloud.talk.jobs.UploadAndShareFilesWorker
 import com.nextcloud.talk.logger.Logger
 import com.nextcloud.talk.mediaviewer.model.MediaViewerGroup
@@ -75,7 +78,7 @@ import com.nextcloud.talk.threadsoverview.data.ThreadsRepository
 import com.nextcloud.talk.users.UserManager
 import com.nextcloud.talk.utils.ApiUtils
 import com.nextcloud.talk.utils.CapabilitiesUtil.hasSpreedFeatureCapability
-import com.nextcloud.talk.utils.CharacterAvatarUtils
+import com.nextcloud.talk.utils.ContactUtils
 import com.nextcloud.talk.utils.ConversationUtils
 import com.nextcloud.talk.utils.Mimetype
 import com.nextcloud.talk.utils.MimetypeUtils
@@ -83,12 +86,12 @@ import com.nextcloud.talk.utils.ParticipantPermissions
 import com.nextcloud.talk.utils.SpreedFeatures
 import com.nextcloud.talk.utils.UploadSourceGrants
 import com.nextcloud.talk.utils.UserIdUtils
-import com.nextcloud.talk.utils.throttleLatest
 import com.nextcloud.talk.utils.bundle.BundleKeys
 import com.nextcloud.talk.utils.isTransientFailure
 import com.nextcloud.talk.utils.message.SendMessageUtils
 import com.nextcloud.talk.utils.message.groupHashOf
 import com.nextcloud.talk.utils.preferences.AppPreferences
+import com.nextcloud.talk.utils.throttleLatest
 import com.nextcloud.talk.webrtc.WebSocketConnectionHelper
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -117,6 +120,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -146,7 +150,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 import javax.inject.Inject
-import androidx.core.net.toUri
 
 private const val FILE_PLACEHOLDER_MESSAGE = "{file}"
 private const val VCARD_MIMETYPE = "text/vcard"
@@ -388,6 +391,10 @@ class ChatViewModel @AssistedInject constructor(
 
     private var lobbyPollingJob: Job? = null
 
+    // The message polling lives as long as this view model. A new screen after a configuration change calls
+    // initData() again, which must not start a second polling loop next to the running one.
+    private var messagePollingJob: Job? = null
+
     private val _uploadProgressMap = MutableStateFlow<Map<String, Int>>(emptyMap())
     val uploadProgressMap: StateFlow<Map<String, Int>> = _uploadProgressMap
 
@@ -506,11 +513,37 @@ class ChatViewModel @AssistedInject constructor(
     override fun onStop(owner: LifecycleOwner) {
         super.onStop(owner)
         currentLifeCycleFlag = LifeCycleFlag.STOPPED
-        // a rotation stops the activity but not the recording: the new activity goes on with it
-        if ((owner as? Activity)?.isChangingConfigurations != true) {
-            mediaRecorderManager.handleOnStop()
-        }
+        // A stopped chat keeps a voice recording running: it ends when the chat is left (onCleared) or by
+        // interruptAudioRecording, not when a rotation or another Talk screen like the media viewer covers the chat.
         chatRepository.handleOnStop()
+    }
+
+    override fun onCleared() {
+        // the recording can not be shown again once the chat is gone
+        if (mediaRecorderManager.mediaRecorderState == MediaRecorderManager.MediaRecorderState.RECORDING) {
+            stopAndDiscardAudioRecording()
+        }
+    }
+
+    /**
+     * Ends a running recording although the chat was not left, e.g. because the app went to the background: a locked
+     * recording keeps what was captured so far and is shown as interrupted, a recording that was still held is
+     * discarded like on a cancelled touch.
+     */
+    fun interruptAudioRecording() {
+        if (mediaRecorderManager.mediaRecorderState != MediaRecorderManager.MediaRecorderState.RECORDING) {
+            return
+        }
+        if (_getVoiceRecordingLocked.value == true) {
+            stopAudioRecording()
+            _voiceRecordingInterrupted.value = true
+        } else {
+            stopAndDiscardAudioRecording()
+        }
+    }
+
+    fun onVoiceRecordingInterruptionShown() {
+        _voiceRecordingInterrupted.value = false
     }
 
     fun onSignalingChatMessageReceived(chatMessages: List<ChatMessageDto>) {
@@ -530,6 +563,12 @@ class ChatViewModel @AssistedInject constructor(
     private val _getVoiceRecordingInProgress: MutableLiveData<Boolean> = MutableLiveData()
     val getVoiceRecordingInProgress: LiveData<Boolean>
         get() = _getVoiceRecordingInProgress
+
+    private val _voiceRecordingInterrupted: MutableLiveData<Boolean> = MutableLiveData(false)
+
+    /** True while the stop of a locked recording by leaving the app was not shown to the user yet. */
+    val voiceRecordingInterrupted: LiveData<Boolean>
+        get() = _voiceRecordingInterrupted
 
     private val _getVoiceRecordingLocked: MutableLiveData<Boolean> = MutableLiveData()
     val getVoiceRecordingLocked: LiveData<Boolean>
@@ -753,7 +792,6 @@ class ChatViewModel @AssistedInject constructor(
         map { entities ->
             entities.map { entity ->
                 entity.toDomainModel().apply {
-                    avatarUrl = getAvatarUrl(this)
                     incoming = actorId != userId
                 }
             }
@@ -800,6 +838,21 @@ class ChatViewModel @AssistedInject constructor(
                         .map { messages -> messages.associateBy { it.jsonMessageId.toLong() } }
                 }
             }
+
+    /**
+     * Reply count of the open thread, read from its cached messages. Every thread message carries the thread's
+     * current count, so this follows the chat while it is open. Emits nothing outside of a thread.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val cachedThreadReplies: Flow<Int> =
+        conversationThreadId?.let { threadId ->
+            conversationAndUserFlow
+                .flatMapLatest { (conversation, _) ->
+                    chatRepository.observeThreadReplies(conversation.internalId, threadId)
+                }
+                .filterNotNull()
+                .distinctUntilChanged()
+        } ?: emptyFlow()
 
     // ------------------------------
     // Last read message cache
@@ -1257,14 +1310,16 @@ class ChatViewModel @AssistedInject constructor(
                         .distinct()
 
                 val isClassified = conversation != null && ConversationUtils.isClassified(conversation, capabilities)
-                val user = currentUserFlow.value
+                val user = currentUser
+                val authHeader = ApiUtils.getCredentials(user.username, user.token)
                 applyMessageGrouping(messages)
                 applySystemMessageGrouping(messages)
                 reorderKnownSendSequence(messages)
                 val uiMessages = messages.map { message ->
                     val parent: ChatMessage? = combinedMap[message.parentMessageId]
                     message.toUiModel(
-                        user = user ?: currentUser,
+                        user = user,
+                        authHeader = authHeader,
                         chatMessage = message,
                         lastCommonReadMessageId = lastCommonRead,
                         parentMessage = parent,
@@ -1468,11 +1523,13 @@ class ChatViewModel @AssistedInject constructor(
 
                 // The live-update mode (chat relay vs long polling) is decided in parallel: the
                 // initial load must never wait for the websocket to connect.
-                viewModelScope.launch {
-                    val isChatRelaySupported = withTimeoutOrNull(WEBSOCKET_CONNECT_TIMEOUT_MS) {
-                        awaitChatRelaySupport(user)
-                    } ?: false
-                    startMessagePolling(isChatRelaySupported)
+                if (messagePollingJob == null) {
+                    messagePollingJob = viewModelScope.launch {
+                        val isChatRelaySupported = withTimeoutOrNull(WEBSOCKET_CONNECT_TIMEOUT_MS) {
+                            awaitChatRelaySupport(user)
+                        } ?: false
+                        startMessagePolling(isChatRelaySupported)
+                    }
                 }
 
                 loadInitialMessages(
@@ -1481,8 +1538,33 @@ class ChatViewModel @AssistedInject constructor(
                 )
 
                 getCapabilities(user, chatRoomToken, conversation)
+                refreshThreadReplies(credentials, user)
             }
             .launchIn(viewModelScope)
+    }
+
+    /**
+     * Updates the reply counts of the cached thread roots of the main chat with the counts of the recently
+     * active threads on the server. Does nothing inside a thread or when the server has no threads.
+     */
+    @Suppress("Detekt.TooGenericExceptionCaught")
+    private fun refreshThreadReplies(credentials: String, user: User) {
+        if (conversationThreadId != null) return
+        viewModelScope.launch {
+            val capabilities = spreedCapabilities.filterNotNull().first()
+            if (!hasSpreedFeatureCapability(capabilities, SpreedFeatures.THREADS)) return@launch
+            try {
+                val url = ApiUtils.getUrlForRecentThreads(version = 1, baseUrl = user.baseUrl, token = chatRoomToken)
+                val threads = threadsRepository.getThreads(credentials, url, RECENT_THREADS_LIMIT).ocs?.data.orEmpty()
+                chatRepository.updateThreadReplies(
+                    threads.mapNotNull { it.thread }.associate { it.id.toLong() to it.numReplies }
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.e(TAG, "Failed to refresh the reply counts of the recent threads", e)
+            }
+        }
     }
 
     fun isChatRelaySupported(user: User): Boolean {
@@ -1658,24 +1740,6 @@ class ChatViewModel @AssistedInject constructor(
     }
 
     // val timeString = DateUtils.getLocalTimeStringFromTimestamp(message.timestamp)
-
-    /**
-     * Avatar to request from the server for a message, empty for the actors the server has none for
-     * - those get their avatar drawn on the client instead, see [CharacterAvatarUtils].
-     */
-    fun getAvatarUrl(message: ChatMessage): String =
-        if (!message.hasClientSideAvatar()) {
-            ApiUtils.getUrlForAvatar(
-                currentUser.baseUrl,
-                message.actorId,
-                false
-            )
-        } else {
-            ""
-        }
-
-    private fun ChatMessage.hasClientSideAvatar(): Boolean =
-        CharacterAvatarUtils.avatarFor(actorType, actorId, actorDisplayName, guestLabel = null) != null
 
     fun initData() {
         chatRepository.initData(
@@ -2342,21 +2406,27 @@ class ChatViewModel @AssistedInject constructor(
     fun startAudioRecording(context: Context, currentConversation: ConversationModel) {
         audioFocusRequestManager.audioFocusRequest(true) {
             Log.d(TAG, "Recording Started")
-            mediaRecorderManager.start(context, currentConversation)
+            mediaRecorderManager.start(context, currentConversation, onSilenced = ::interruptAudioRecording)
             _getVoiceRecordingInProgress.postValue(true)
         }
     }
 
+    /** Stops the recorder whether or not the audio focus is given back, so the shown state never outlasts it. */
     fun stopAudioRecording() {
-        audioFocusRequestManager.audioFocusRequest(false) {
-            mediaRecorderManager.stop()
-            _getVoiceRecordingInProgress.postValue(false)
-            Log.d(TAG, "Recording stopped")
-        }
+        mediaRecorderManager.stop()
+        _getVoiceRecordingInProgress.postValue(false)
+        Log.d(TAG, "Recording stopped")
+        audioFocusRequestManager.audioFocusRequest(false) {}
     }
 
     fun stopAndSendAudioRecording(roomToken: String = "", replyToMessageId: Int? = null, displayName: String) {
         stopAudioRecording()
+
+        val voiceRecordFile = mediaRecorderManager.currentVoiceRecordFile
+        if (voiceRecordFile.isEmpty() || !File(voiceRecordFile).exists()) {
+            Log.w(TAG, "No voice recording file available. Nothing to upload")
+            return
+        }
 
         if (mediaRecorderManager.mediaRecorderState != MediaRecorderManager.MediaRecorderState.ERROR) {
             val uri = Uri.fromFile(File(mediaRecorderManager.currentVoiceRecordFile))
@@ -2381,7 +2451,29 @@ class ChatViewModel @AssistedInject constructor(
 
     fun getCurrentVoiceRecordFile(): String = mediaRecorderManager.currentVoiceRecordFile
 
+    /** Saves the picked contact as a vCard and uploads it, also when the chat is recreated meanwhile. */
     @Suppress("LongParameterList")
+    fun shareContact(contactUri: Uri, roomToken: String, replyToMessageId: Int?, displayName: String) {
+        val context = NextcloudTalkApplication.sharedApplication!!.applicationContext
+        viewModelScope.launch {
+            val file = runProviderCall(onFailure = { e -> logger.e(TAG, "Failed to read contact $contactUri", e) }) {
+                ContactUtils.saveContactAsVcfFile(context, contactUri)
+            }
+            if (file == null) {
+                _actionFailures.emit(R.string.nc_common_error_sorry)
+                return@launch
+            }
+            val shareUri = FileProvider.getUriForFile(context, BuildConfig.APPLICATION_ID, file)
+            uploadFile(
+                fileUri = shareUri.toString(),
+                isVoiceMessage = false,
+                roomToken = roomToken,
+                replyToMessageId = replyToMessageId,
+                displayName = displayName
+            )
+        }
+    }
+
     fun uploadFile(
         fileUri: String,
         isVoiceMessage: Boolean,
@@ -2886,6 +2978,7 @@ class ChatViewModel @AssistedInject constructor(
         const val HTTP_CODE_OK: Int = 200
         private const val CONVERSATION_AND_USER_FLOW_SHARING_TIMEOUT_MS = 5_000L
         private const val WEBSOCKET_CONNECT_TIMEOUT_MS = 3000L
+        private const val RECENT_THREADS_LIMIT = 50
         private const val WEBSOCKET_POLL_INTERVAL_MS = 50L
         private const val ROOM_REFRESH_DEBOUNCE_MS = 500L
         private const val MESSAGES_REBUILD_WINDOW_MS = 200L

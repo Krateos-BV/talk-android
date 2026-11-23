@@ -53,12 +53,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.net.toUri
@@ -90,7 +93,11 @@ import com.nextcloud.talk.call.e2ee.FrameKeyRing
 import com.nextcloud.talk.call.MutableLocalCallParticipantModel
 import com.nextcloud.talk.call.ReactionAnimator
 import com.nextcloud.talk.call.ScreenCapture
+import com.nextcloud.talk.call.components.CALL_VIEW_MODE_BUTTON_SIZE
+import com.nextcloud.talk.call.components.CallViewMode
+import com.nextcloud.talk.call.components.CallViewModeButton
 import com.nextcloud.talk.call.components.ParticipantGrid
+import com.nextcloud.talk.call.components.ParticipantSpeakerView
 import com.nextcloud.talk.call.components.SelfVideoView
 import com.nextcloud.talk.call.components.screenshare.ScreenShareComponent
 import com.nextcloud.talk.camera.BackgroundBlurFrameProcessor
@@ -117,6 +124,7 @@ import com.nextcloud.talk.models.json.signaling.DataChannelMessageDto
 import com.nextcloud.talk.models.json.signaling.NCSignalingMessageDto
 import com.nextcloud.talk.models.json.signaling.SignalingDto
 import com.nextcloud.talk.models.json.signaling.SignalingOverall
+import com.nextcloud.talk.models.json.signaling.settings.SignalingSettingsDto
 import com.nextcloud.talk.models.json.signaling.settings.SignalingSettingsOverall
 import com.nextcloud.talk.raisehand.viewmodel.RaiseHandViewModel
 import com.nextcloud.talk.raisehand.viewmodel.RaiseHandViewModel.LoweredHandState
@@ -128,6 +136,7 @@ import com.nextcloud.talk.signaling.SignalingMessageReceiver.CallParticipantMess
 import com.nextcloud.talk.signaling.SignalingMessageReceiver.LocalParticipantMessageListener
 import com.nextcloud.talk.signaling.SignalingMessageReceiver.OfferMessageListener
 import com.nextcloud.talk.signaling.SignalingMessageSender
+import com.nextcloud.talk.ui.LocalImageAuthHeader
 import com.nextcloud.talk.ui.dialog.AudioOutputDialog
 import com.nextcloud.talk.ui.dialog.MoreCallActionsDialog
 import com.nextcloud.talk.utils.ApiUtils
@@ -164,6 +173,7 @@ import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_SWITCH_TO_ROOM
 import com.nextcloud.talk.utils.finishAndRemoveTaskIfPresent
 import com.nextcloud.talk.utils.isShareTask
 import com.nextcloud.talk.utils.moveToFrontIfPresent
+import com.nextcloud.talk.utils.permissions.LocalNetworkPermission
 import com.nextcloud.talk.utils.permissions.PlatformPermissionUtil
 import com.nextcloud.talk.utils.power.PowerManagerUtils
 import com.nextcloud.talk.utils.registerPermissionHandlerBroadcastReceiver
@@ -190,6 +200,7 @@ import io.reactivex.schedulers.Schedulers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.Cache
 import org.apache.commons.lang3.StringEscapeUtils
 import org.greenrobot.eventbus.Subscribe
@@ -371,6 +382,16 @@ class CallActivity : CallBaseActivity() {
     private var roomJoinRefreshes = 0
     private var hasMCU = false
     private var hasExternalSignalingServer = false
+
+    // set while the call waits for the local network permission before connecting to its servers; a call activity
+    // recreated meanwhile starts its call anew and ignores the result
+    private var isAwaitingLocalNetwork = false
+    private val localNetworkPermission = LocalNetworkPermission(this, { viewThemeUtils }) {
+        if (isAwaitingLocalNetwork) {
+            isAwaitingLocalNetwork = false
+            checkCapabilities()
+        }
+    }
     private var isCallEndToEndEncryptionEnabled = false
     private var conversationPassword: String? = null
     private var powerManagerUtils: PowerManagerUtils? = null
@@ -507,6 +528,29 @@ class CallActivity : CallBaseActivity() {
     private var isFrontCamera by mutableStateOf(true)
     private var isSelfVideoEnabled by mutableStateOf(false)
 
+    private fun setUpCallViewModeButton() {
+        val colorScheme = viewThemeUtils.getColorScheme(this)
+        binding!!.callViewModeButton.setContent {
+            MaterialTheme(colorScheme = colorScheme) {
+                val participantUiStates by callViewModel.participants.collectAsState()
+                val viewMode by callViewModel.viewMode.collectAsState()
+
+                // A single participant is shown fullscreen in all view modes
+                if (participantUiStates.size > 1) {
+                    CallViewModeButton(viewMode = viewMode) { selectedViewMode ->
+                        callViewModel.setViewMode(selectedViewMode)
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            appPreferences.callViewMode = selectedViewMode.preferenceValue
+                        }
+                    }
+                } else {
+                    // Keeps the height of the header, so the participants do not move when the button is shown
+                    Spacer(modifier = Modifier.height(CALL_VIEW_MODE_BUTTON_SIZE))
+                }
+            }
+        }
+    }
+
     @SuppressLint("ClickableViewAccessibility", "Detekt.LongMethod")
     override fun onCreate(savedInstanceState: Bundle?) {
         Log.d(TAG, "onCreate")
@@ -515,6 +559,14 @@ class CallActivity : CallBaseActivity() {
         conversationUser = setUpBoundUserOrFinish() ?: return
 
         callViewModel = ViewModelProvider(this, viewModelFactory)[CallViewModel::class.java]
+        if (!callViewModel.hasViewMode) {
+            lifecycleScope.launch {
+                val viewMode = withContext(Dispatchers.IO) {
+                    CallViewMode.fromPreferenceValue(appPreferences.callViewMode)
+                }
+                callViewModel.restoreViewMode(viewMode)
+            }
+        }
 
         rootEglBase = EglBase.create()
         binding = CallActivityBinding.inflate(layoutInflater)
@@ -557,28 +609,45 @@ class CallActivity : CallBaseActivity() {
 
         binding!!.composeParticipantGrid.setContent {
             MaterialTheme {
-                val screenShareParticipantUiState by callViewModel.activeScreenShareSession.collectAsState()
-                val participantUiStates by callViewModel.participants.collectAsState(initial = emptyList())
+                CompositionLocalProvider(LocalImageAuthHeader provides conversationUser.getCredentials()) {
+                    val screenShareParticipantUiState by callViewModel.activeScreenShareSession.collectAsState()
+                    val participantUiStates by callViewModel.participants.collectAsState(initial = emptyList())
+                    val speakers by callViewModel.speakers.collectAsState()
+                    val viewMode by callViewModel.viewMode.collectAsState()
+                    val speakerViewOrder by callViewModel.speakerViewOrder.collectAsState()
 
-                LaunchedEffect(participantUiStates) {
-                    participantUiStates.forEach {
-                        Log.d(TAG, "Participant: ${it.nick} (${it.sessionKey})")
-                    }
-                }
-
-                if (screenShareParticipantUiState == null) {
-                    ParticipantGrid(
-                        participantUiStates = participantUiStates,
-                        eglBase = rootEglBase!!,
-                        isVoiceOnlyCall = isVoiceOnlyCall,
-                        onClick = {},
-                        onScreenShareIconClick = {
-                            callViewModel.setActiveScreenShareSession(it)
+                    if (screenShareParticipantUiState == null) {
+                        if (viewMode.isSpeakerView) {
+                            ParticipantSpeakerView(
+                                eglBase = rootEglBase!!,
+                                participantUiStates = participantUiStates,
+                                speakerViewOrder = speakerViewOrder,
+                                isParticipantBarVisible = viewMode == CallViewMode.SPEAKER_WITH_PARTICIPANT_BAR,
+                                isVoiceOnlyCall = isVoiceOnlyCall,
+                                onVisibleSessionKeysChanged = callViewModel::setVisibleSessionKeys,
+                                onScreenShareIconClick = {
+                                    callViewModel.setActiveScreenShareSession(it)
+                                }
+                            )
+                        } else {
+                            ParticipantGrid(
+                                participantUiStates = participantUiStates,
+                                eglBase = rootEglBase!!,
+                                isVoiceOnlyCall = isVoiceOnlyCall,
+                                speakers = speakers,
+                                onVisibleSessionKeysChanged = callViewModel::setVisibleSessionKeys,
+                                onClick = {},
+                                onScreenShareIconClick = {
+                                    callViewModel.setActiveScreenShareSession(it)
+                                }
+                            )
                         }
-                    )
+                    }
                 }
             }
         }
+
+        setUpCallViewModeButton()
 
         hideNavigationIfNoPipAvailable()
         val extras = intent.extras
@@ -1360,6 +1429,8 @@ class CallActivity : CallBaseActivity() {
             }
         }
 
+        addLocalNetworkPermissionOnFirstCall(permissionsToRequest)
+
         if (permissionsToRequest.isNotEmpty()) {
             if (rationaleList.isNotEmpty()) {
                 showRationaleDialog(permissionsToRequest, rationaleList)
@@ -1368,6 +1439,18 @@ class CallActivity : CallBaseActivity() {
             }
         } else if (!isConnectionEstablished) {
             prepareCall()
+        }
+    }
+
+    // Peers on the same local network only connect directly with the local network permission. Without it the call
+    // still works through the TURN server, so don't ask again after a denial. After a second denial, here or on the
+    // conversation list, the request is still added, but the system answers it without showing a prompt.
+    private fun addLocalNetworkPermissionOnFirstCall(permissionsToRequest: MutableList<String>) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN &&
+            !permissionUtil!!.isLocalNetworkPermissionGranted() &&
+            !shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_LOCAL_NETWORK)
+        ) {
+            permissionsToRequest.add(Manifest.permission.ACCESS_LOCAL_NETWORK)
         }
     }
 
@@ -1842,7 +1925,10 @@ class CallActivity : CallBaseActivity() {
 
                         addIceServers(signalingSettingsOverall, apiVersion)
                     }
-                    checkCapabilities()
+                    // The signaling, STUN and TURN servers can be on the local network even when the server isn't.
+                    // Without the permission the call still starts, and fails to reach them.
+                    isAwaitingLocalNetwork = true
+                    localNetworkPermission.ensure(callServerUrls(signalingSettingsOverall.ocs?.settings))
                 }
 
                 override fun onError(e: Throwable) {
@@ -1853,6 +1939,12 @@ class CallActivity : CallBaseActivity() {
                     // unused atm
                 }
             })
+    }
+
+    private fun callServerUrls(settings: SignalingSettingsDto?): List<String?> {
+        val iceServers = settings?.stunServers.orEmpty() + settings?.turnServers.orEmpty()
+        val iceServerUrls = iceServers.flatMap { it.urls.orEmpty() + it.url }
+        return iceServerUrls + settings?.externalSignalingServer
     }
 
     private fun addIceServers(signalingSettingsOverall: SignalingSettingsOverall, apiVersion: Int) {

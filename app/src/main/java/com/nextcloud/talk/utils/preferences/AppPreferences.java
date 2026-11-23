@@ -122,6 +122,10 @@ public interface AppPreferences {
 
     void setCallMicrophoneMuted(boolean value);
 
+    String getCallViewMode();
+
+    void setCallViewMode(String value);
+
     boolean getIsKeyboardIncognito();
 
     void setIncognitoKeyboard(boolean value);
@@ -168,14 +172,6 @@ public interface AppPreferences {
     void setPhoneBookIntegrationLastRun(long currentTimeMillis);
 
     long getPhoneBookIntegrationLastRun(Long defaultValue);
-
-    void setReadPrivacy(boolean value);
-
-    boolean getReadPrivacy();
-
-    void setTypingStatus(boolean value);
-
-    boolean getTypingStatus();
 
     void setSorting(String value);
 

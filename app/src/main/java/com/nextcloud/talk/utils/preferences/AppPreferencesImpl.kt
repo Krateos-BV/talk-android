@@ -321,6 +321,18 @@ class AppPreferencesImpl(val context: Context) : AppPreferences {
             }
         }
 
+    override fun getCallViewMode(): String =
+        runBlocking {
+            async { readString(CALL_VIEW_MODE).first() }
+        }.getCompleted()
+
+    override fun setCallViewMode(value: String) =
+        runBlocking<Unit> {
+            async {
+                writeString(CALL_VIEW_MODE, value)
+            }
+        }
+
     override fun getIsKeyboardIncognito(): Boolean {
         val read = runBlocking { async { readBoolean(INCOGNITO_KEYBOARD).first() } }.getCompleted()
         return read
@@ -511,31 +523,6 @@ class AppPreferencesImpl(val context: Context) : AppPreferences {
         return result
     }
 
-    override fun setReadPrivacy(value: Boolean) =
-        runBlocking<Unit> {
-            val key = context.resources.getString(R.string.nc_settings_read_privacy_key)
-            async {
-                writeBoolean(key, value)
-            }
-        }
-
-    override fun getReadPrivacy(): Boolean {
-        val key = context.resources.getString(R.string.nc_settings_read_privacy_key)
-        return runBlocking { async { readBoolean(key).first() } }.getCompleted()
-    }
-
-    override fun setTypingStatus(value: Boolean) =
-        runBlocking<Unit> {
-            async {
-                writeBoolean(TYPING_STATUS, value)
-            }
-        }
-
-    override fun getTypingStatus(): Boolean =
-        runBlocking {
-            async { readBoolean(TYPING_STATUS).first() }
-        }.getCompleted()
-
     override fun setSorting(value: String?) =
         runBlocking<Unit> {
             val key = context.resources.getString(R.string.nc_file_browser_sort_by_key)
@@ -725,6 +712,7 @@ class AppPreferencesImpl(val context: Context) : AppPreferences {
         const val SCREEN_SECURITY = "screen_security"
         const val SCREEN_LOCK = "screen_lock"
         const val CALL_MICROPHONE_MUTED = "call_microphone_muted"
+        const val CALL_VIEW_MODE = "call_view_mode"
         const val INCOGNITO_KEYBOARD = "incognito_keyboard"
         const val SHOW_ECOSYSTEM = "SHOW_ECOSYSTEM"
         const val PHONE_BOOK_INTEGRATION = "phone_book_integration"
@@ -735,7 +723,6 @@ class AppPreferencesImpl(val context: Context) : AppPreferences {
         const val DB_CYPHER_V4_UPGRADE = "db_cypher_v4_upgrade"
         const val DB_ROOM_MIGRATED = "db_room_migrated"
         const val PHONE_BOOK_INTEGRATION_LAST_RUN = "phone_book_integration_last_run"
-        const val TYPING_STATUS = "typing_status"
         const val MESSAGE_QUEUE = "@message_queue"
         const val PLAY_BACK = "_playback"
         const val AUDIO_FILE_PLAY_BACK = "_audio_file_playback"

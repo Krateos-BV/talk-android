@@ -14,7 +14,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose") version "2.4.21"
     id("com.android.built-in-kotlin")
     id("com.android.legacy-kapt")
-    id("com.google.devtools.ksp") version "2.3.12"
+    id("com.google.devtools.ksp") version "2.3.13"
     id("com.android.application")
     id("kotlin-parcelize")
     id("com.github.spotbugs")
@@ -57,13 +57,20 @@ android {
             providers.gradleProperty("NC_TEST_SERVER_PASSWORD").getOrElse("")
 
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+<<<<<<< HEAD
         // Checked by scripts/xenia/checkVersion.py, which also documents the scheme's invariants.
         // CalVer YY.M.D.ID; versionCode is the date-encoded integer YYMMDDID (ID zero-padded to 3 digits)
         versionCode = 260926000
         versionName = "26.9.26.0"
+=======
+        // mayor.minor.hotfix.increment (for increment: 01-50=Alpha / 51-89=RC / 90-99=stable)
+        // xx   .xxx  .xx    .xx
+        versionCode = 260000009
+        versionName = "26.0.0 Alpha 09"
+>>>>>>> upstream/master
 
         vectorDrawables.useSupportLibrary = true
 
@@ -107,10 +114,20 @@ android {
         unitTests.all {
             it.useJUnitPlatform()
             it.maxHeapSize = "2g"
+<<<<<<< HEAD
             it.testLogging {
                 events("started", "failed", "skipped")
                 exceptionFormat = TestExceptionFormat.FULL
             }
+=======
+            it.testLogging.events("started", "failed", "skipped")
+            // Robolectric downloads its Android SDK jars itself, from Maven Central unless told otherwise. Take
+            // them from the mirror the build uses too, see build.gradle; Robolectric checks their SHA-512.
+            it.systemProperty(
+                "robolectric.dependency.repo.url",
+                "https://maven-central.storage-download.googleapis.com/maven2/"
+            )
+>>>>>>> upstream/master
         }
         unitTests.isReturnDefaultValues = true
     }
@@ -257,7 +274,7 @@ dependencies {
     implementation("com.github.bitfireAT:dav4jvm:2.1.3") {
         exclude(group = "org.ogce", module = "xpp3") // Android comes with its own XmlPullParser
     }
-    implementation("org.conscrypt:conscrypt-android:2.7.0")
+    implementation("org.conscrypt:conscrypt-android:2.9.0")
     implementation("com.github.nextcloud-deps:qrcodescanner:0.1.2.4") // "com.github.blikoon:QRCodeScanner:0.1.2"
 
     implementation("androidx.exifinterface:exifinterface:1.4.2")
@@ -270,6 +287,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
 
     implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.browser:browser:1.10.0")
 
     implementation("io.reactivex.rxjava2:rxandroid:2.1.1")
     implementation("io.reactivex.rxjava2:rxjava:2.2.21")
@@ -279,7 +297,7 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:$okhttpVersion")
 
     implementation("com.bluelinelabs:logansquare:1.3.7")
-    implementation("com.fasterxml.jackson.core:jackson-core:2.22.4")
+    implementation("com.fasterxml.jackson.core:jackson-core:2.23.0")
     kapt("com.bluelinelabs:logansquare-compiler:1.3.7")
 
     implementation("com.squareup.retrofit2:retrofit:$retrofit2Version")
@@ -303,7 +321,7 @@ dependencies {
     implementation("androidx.room:room-ktx:$roomVersion")
 
     implementation("org.parceler:parceler-api:$parcelerVersion")
-    implementation("org.apache.commons:commons-lang3:3.21.0")
+    implementation("org.apache.commons:commons-lang3:3.22.0")
     implementation("com.google.code.findbugs:jsr305:3.0.2")
     implementation("joda-time:joda-time:2.15.0")
     implementation("io.coil-kt:coil:$coilKtVersion")
@@ -331,7 +349,13 @@ dependencies {
     implementation("io.noties.markwon:ext-tasklist:$markwonVersion")
     implementation("io.noties.markwon:ext-tables:$markwonVersion")
 
+<<<<<<< HEAD
     implementation("io.github.crow-misia.libyuv:libyuv-android:0.43.2")
+=======
+    // Computer Vision - for background effects during video calls (gplay only for now)
+    "gplayImplementation"("com.google.ai.edge.litert:litert:1.4.2")
+    implementation("io.github.crow-misia.libyuv:libyuv-android:0.44.0")
+>>>>>>> upstream/master
 
     // Avatar picker
     implementation("com.github.nextcloud-deps:ImagePicker:2.1.0.2")
@@ -353,13 +377,13 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.2.0")
     implementation("androidx.sharetarget:sharetarget:1.2.0")
     implementation("androidx.activity:activity-ktx:1.13.0")
-    implementation("com.github.nextcloud.android-common:ui:0.34.0")
-    implementation("com.github.nextcloud.android-common:core:0.34.0")
+    implementation("com.github.nextcloud.android-common:ui:580a84868ae2af10b2ace13dadc083f166047493")
+    implementation("com.github.nextcloud.android-common:core:580a84868ae2af10b2ace13dadc083f166047493")
     implementation("com.github.nextcloud-deps:android-talk-webrtc:155.8059.1")
     implementation("com.github.nextcloud-releases:talk-clients-vodozemac:0.0.2")
 
     "gplayImplementation"("com.google.android.gms:play-services-base:18.11.1")
-    "gplayImplementation"("com.google.firebase:firebase-messaging:26.0.1")
+    "gplayImplementation"("com.google.firebase:firebase-messaging:26.0.2")
 
     implementation("org.unifiedpush.android:connector:3.3.5")
     "genericImplementation"("org.unifiedpush.android:embedded-fcm-distributor:3.1.0")

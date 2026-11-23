@@ -46,6 +46,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import autodagger.AutoInjector
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.nextcloud.android.common.core.utils.AccountNameUtils
 import com.nextcloud.android.common.core.utils.ecosystem.AccountReceiverCallback
 import com.nextcloud.android.common.core.utils.ecosystem.EcosystemManager
 import com.nextcloud.talk.R
@@ -97,6 +98,7 @@ import com.nextcloud.talk.ui.dialog.FilterConversationFragment
 import com.nextcloud.talk.ui.dialog.FilterConversationFragment.Companion.ARCHIVE
 import com.nextcloud.talk.ui.dialog.FilterConversationFragment.Companion.MENTION
 import com.nextcloud.talk.ui.dialog.FilterConversationFragment.Companion.UNREAD
+import com.nextcloud.talk.utils.AccountUtils
 import com.nextcloud.talk.utils.ApiUtils
 import com.nextcloud.talk.utils.AppTasks
 import com.nextcloud.talk.utils.BrandingUtils
@@ -133,6 +135,7 @@ import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_RECORDING_STATE
 import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_ROOM_TOKEN
 import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_SCROLL_TO_NOTIFICATION_CATEGORY
 import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_SHARED_TEXT
+import com.nextcloud.talk.utils.permissions.LocalNetworkPermission
 import com.nextcloud.talk.utils.permissions.PlatformPermissionUtil
 import com.nextcloud.talk.utils.power.PowerManagerUtils
 import com.nextcloud.talk.utils.setExpeditedIfSupported
@@ -204,11 +207,16 @@ class ConversationsListActivity : BaseActivity() {
     }
 
     private lateinit var currentUser: User
+    private val localNetworkPermission = LocalNetworkPermission(this, { viewThemeUtils })
+
+    // checked when the list is created, not again when it is recreated, e.g. after a rotation
+    private var isLocalNetworkCheckDue = false
     private val snackbarHostState = SnackbarHostState()
     private val isMaintenanceModeState = MutableStateFlow(false)
     private val showUnreadBubbleState = MutableStateFlow(false)
     private val isFabVisibleState = MutableStateFlow(true)
     private val showNotificationWarningState = MutableStateFlow(false)
+    private val showEcosystemState = MutableStateFlow(false)
     private val isRefreshingState = MutableStateFlow(false)
     private val showAccountDialogState = MutableStateFlow(false)
 
@@ -225,6 +233,7 @@ class ConversationsListActivity : BaseActivity() {
     private val hasMultipleAccountsState = MutableStateFlow(false)
     private val showShareToScreen get() = showShareToScreenState.value
     private val forwardMessage get() = forwardMessageState.value
+    private val isPickingConversation get() = forwardMessage || isShare(intent)
     private var filesToShare: ArrayList<String>? = null
     private var selectedConversation: ConversationModel? = null
     private var textToPaste: String? = ""
@@ -261,14 +270,21 @@ class ConversationsListActivity : BaseActivity() {
     // here would leave the app. Instead leave the forward mode and return to the source chat.
     private fun cancelForwarding() {
         val sourceRoomToken = intent.getStringExtra(KEY_FORWARD_HIDE_SOURCE_ROOM)
+        endForwarding()
+        if (sourceRoomToken != null) {
+            startActivity(ChatActivity.createIntent(context, currentUser.id!!, sourceRoomToken))
+        }
+    }
+
+    // the extras are removed as well, so that a recreation or the next resume doesn't bring back the forward mode or
+    // keep hiding the source chat
+    private fun endForwarding() {
         intent.removeExtra(KEY_FORWARD_MSG_FLAG)
         intent.removeExtra(KEY_FORWARD_MSG_TEXT)
         intent.removeExtra(KEY_FORWARD_HIDE_SOURCE_ROOM)
         forwardMessageState.value = false
         conversationsListViewModel.setHideRoomToken(null)
-        if (sourceRoomToken != null) {
-            startActivity(ChatActivity.createIntent(context, currentUser.id!!, sourceRoomToken))
-        }
+        conversationsListViewModel.setIsSearchActive(false)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -444,6 +460,10 @@ class ConversationsListActivity : BaseActivity() {
     private fun showNewIntent(intent: Intent) {
         setIntent(intentOfAccount(this, intent, currentUser.id))
         forwardMessageState.value = intent.getBooleanExtra(KEY_FORWARD_MSG_FLAG, false)
+        // a search left open would hide that a conversation is to be picked now
+        if (isPickingConversation) {
+            conversationsListViewModel.setIsSearchActive(false)
+        }
         conversationsListViewModel.setHideRoomToken(intent.getStringExtra(KEY_FORWARD_HIDE_SOURCE_ROOM))
         handleEcoSystemIntent(intent)
     }
@@ -454,7 +474,11 @@ class ConversationsListActivity : BaseActivity() {
             credentials = credentials ?: "",
             showLogo = BrandingUtils.isOriginalNextcloudClient(applicationContext),
             viewThemeUtils = viewThemeUtils,
+<<<<<<< HEAD
             isShowEcosystem = appPreferences.isShowEcosystem,
+=======
+            showEcosystemFlow = showEcosystemState,
+>>>>>>> upstream/master
             snackbarHostState = snackbarHostState,
             isMaintenanceModeFlow = isMaintenanceModeState,
             isOnlineFlow = networkMonitor.isOnline,
@@ -556,22 +580,16 @@ class ConversationsListActivity : BaseActivity() {
         ecosystemManager.receiveAccount(
             intent,
             object : AccountReceiverCallback {
-                @SuppressLint("UseKtx")
                 override fun onAccountReceived(accountName: String) {
-                    val baseUrl = accountName.substringAfterLast("@")
-                    val trimmedAccountName = accountName.substringBeforeLast("@")
                     lifecycleScope.launch {
-                        val users = userManager.getUsers()
-                        val user = users.firstOrNull { user ->
-                            user.username == trimmedAccountName && baseUrl == user.baseUrl?.toUri()?.host
-                        }
+                        val user = AccountUtils.findUserForFilesAccount(context, accountName, userManager.getUsers())
                         if (user != null && userManager.setUserAsActive(user)) {
                             startActivity(createInPlaceAccountSwitchIntent(context, user.id!!))
                         } else {
                             showSnackbar(getString(R.string.nc_no_account_found))
                         }
                     }
-                    Log.d(TAG, trimmedAccountName)
+                    Log.d(TAG, AccountNameUtils.getUserPart(accountName))
                 }
 
                 override fun onAccountError(reason: String) {
@@ -584,12 +602,27 @@ class ConversationsListActivity : BaseActivity() {
     @SuppressLint("InlinedApi")
     override fun onPostCreate(savedInstanceState: Bundle?) {
         super.onPostCreate(savedInstanceState)
+        isLocalNetworkCheckDue = savedInstanceState == null
 
         // handle notification permission on API level >= 33
         if (needsPostNotificationsPermission()) {
             requestPermissions(
                 arrayOf(Manifest.permission.POST_NOTIFICATIONS),
                 REQUEST_POST_NOTIFICATIONS_PERMISSION
+            )
+        } else {
+            checkLocalNetworkPermission()
+        }
+    }
+
+    // Accounts added before the local network permission existed, or a server that only resolves to the local
+    // network at home, never went through the check on server selection. The chat also connects to the signaling
+    // server of a high-performance backend, which can be on the local network behind a public server.
+    private fun checkLocalNetworkPermission() {
+        if (isLocalNetworkCheckDue && ::currentUser.isInitialized) {
+            isLocalNetworkCheckDue = false
+            localNetworkPermission.ensure(
+                listOf(currentUser.baseUrl, currentUser.externalSignalingServer?.externalSignalingServer)
             )
         }
     }
@@ -612,7 +645,6 @@ class ConversationsListActivity : BaseActivity() {
     private fun switchToDefaultAccountIfChanged() {
         if (isRelaunching) return
         val defaultUserId = defaultAccountProvider.getDefaultUserBlocking()?.id ?: return
-        val isPickingConversation = forwardMessage || isShare(intent)
         if (defaultUserId != currentUser.id && !isPickingConversation) {
             relaunchForAccount(defaultUserId, createIntent(this))
         }
@@ -630,6 +662,9 @@ class ConversationsListActivity : BaseActivity() {
         }
 
         showNotificationWarningState.value = shouldShowNotificationWarning()
+        // may have been changed in the settings meanwhile
+        val isBrandedClient = resources.getBoolean(R.bool.is_branded_client)
+        showEcosystemState.value = appPreferences.isShowEcosystem && !isBrandedClient
         showShareToScreenState.value = isShare(intent)
 
         takeConversationOfShortcut()
@@ -900,7 +935,7 @@ class ConversationsListActivity : BaseActivity() {
     }
 
     private fun handleConversationLongClick(model: ConversationModel) {
-        if (!showShareToScreen && networkMonitor.isOnline.value) {
+        if (!isPickingConversation && networkMonitor.isOnline.value) {
             conversationsListViewModel.setSelectedConversationForOps(model)
         }
     }
@@ -1151,8 +1186,9 @@ class ConversationsListActivity : BaseActivity() {
                 }
             } else if (forwardMessage) {
                 if (hasChatPermission && !isReadOnlyConversation(selectedConversation!!)) {
-                    openConversation(intent.getStringExtra(KEY_FORWARD_MSG_TEXT))
-                    forwardMessageState.value = false
+                    if (openConversation(intent.getStringExtra(KEY_FORWARD_MSG_TEXT))) {
+                        endForwarding()
+                    }
                 } else {
                     showSnackbar(getString(R.string.send_to_forbidden))
                 }
@@ -1240,7 +1276,7 @@ class ConversationsListActivity : BaseActivity() {
         if (FileUtils.isTrustedShareUri(uri, this)) {
             filesToShare!!.add(uri.toString())
         } else {
-            Log.w(TAG, "Rejecting untrusted uri from share intent: $uri")
+            Log.w(TAG, "Rejecting untrusted uri from share intent.")
         }
     }
 
@@ -1283,6 +1319,7 @@ class ConversationsListActivity : BaseActivity() {
                             "Or permission is already denied and android decided to not offer the dialog."
                     )
                 }
+                checkLocalNetworkPermission()
             }
         }
     }
@@ -1402,12 +1439,13 @@ class ConversationsListActivity : BaseActivity() {
         }
     }
 
-    private fun openConversation(textToPaste: String? = "") {
+    /** Opens the selected conversation, returning false if it can't be opened during the current call. */
+    private fun openConversation(textToPaste: String? = ""): Boolean {
         if (CallActivity.active &&
             !ApplicationWideCurrentRoomHolder.getInstance().isCurrentRoom(selectedConversation!!.token, currentUser.id)
         ) {
             showSnackbar(context.getString(R.string.restrict_join_other_room_while_call))
-            return
+            return false
         }
 
         val bundle = Bundle()
@@ -1427,6 +1465,7 @@ class ConversationsListActivity : BaseActivity() {
         }
 
         clearIntentAction()
+        return true
     }
 
     /**

@@ -178,6 +178,8 @@
     <string name="nc_call_ongoing_notification_default_title">Kõne on pooleli</string>
     <string name="nc_call_ongoing_notification_end_action">Lõpeta kõne</string>
     <string name="nc_call_ongoing_notification_return_action">Tagasi kõne juurde</string>
+    <string name="nc_call_ongoing_notification_screen_sharing">Sa oled jagamas ekraanivaadet</string>
+    <string name="nc_call_participant_bar_scroll_to_start">Keri esimese osalejani</string>
     <string name="nc_call_raised_hand">%1$s andis käega märku</string>
     <string name="nc_call_reconnecting">Loon uuesti ühendust…</string>
     <string name="nc_call_ringing">HELISEB</string>
@@ -189,6 +191,10 @@
     <string name="nc_call_timeout">45 sekundi jooksul pole vastust, uuesti proovimiseks klõpsi</string>
     <string name="nc_call_unknown">„%s“ kõne</string>
     <string name="nc_call_video">„%s“ videokõne</string>
+    <string name="nc_call_view_mode">Kõnevaate liik</string>
+    <string name="nc_call_view_mode_grid">Ruudustikvaade</string>
+    <string name="nc_call_view_mode_speaker">Esineja vaade</string>
+    <string name="nc_call_view_mode_speaker_with_participant_bar">Esineja vaade osalejate ribaga</string>
     <string name="nc_call_voice">„%s“ häälkõne</string>
     <string name="nc_camera_permission_hint">Et saaksid suhtlemisel kasutada videoedastust, palun luba rakendusel kasutada kaamerat.</string>
     <string name="nc_cancel">Loobu</string>
@@ -280,7 +286,7 @@
     <string name="nc_date_header_today">Täna</string>
     <string name="nc_date_header_yesterday">Eile</string>
     <string name="nc_deep_link_join">Liitu</string>
-    <string name="nc_deep_link_join_message">See vestlus teenuses %1$s pole sinu vestluste loendis. Selle avamin võib sind lisada osalejaks.</string>
+    <string name="nc_deep_link_join_message">See vestlus teenuses %1$s pole sinu vestluste loendis. Selle avamine võib sind lisada osalejaks.</string>
     <string name="nc_deep_link_join_title">Kas liitud vestlustega?</string>
     <string name="nc_delete">Kustuta</string>
     <string name="nc_delete_all">Kustuta kõik</string>
@@ -329,6 +335,7 @@
     <string name="nc_expire_messages">Lase vestluse sõnumeil aeguda</string>
     <string name="nc_expire_messages_explanation">Vestluse sõnumid saad määrata kustuma etteantud aja järel. Palun arvesta, et sel juhul vestluses jagatud failid jäävad omaniku jaoks nähtavaks, aga pole enam vestluse jaoks jagatud.</string>
     <string name="nc_external_server_failed">Kõnehõlbustuse seadistusi ei õnnestunud laadida</string>
+    <string name="nc_federated_user">Kasutaja liitpilves</string>
     <string name="nc_federation_invitation_accept">Nõustu</string>
     <string name="nc_federation_invitation_reject">Keeldu</string>
     <string name="nc_federation_invited_to_room">kasutajalt %1$s, %2$s</string>
@@ -342,6 +349,7 @@
     <string name="nc_following_link">Kasutaja, kes järgnes avalikule lingile</string>
     <string name="nc_formatted_message_you">Sina: %1$s</string>
     <string name="nc_forward_message">Edasta</string>
+    <string name="nc_forward_to">Edasta kasutajale</string>
     <string name="nc_forward_to_three_dots">Edasta saajale…</string>
     <string name="nc_gallery">Galeriist</string>
     <string name="nc_get_from_provider">Kas sul ei ole veel oma serverit?\nVajuta siia, et tutvuda teenusepakkujatega</string>
@@ -385,6 +393,9 @@
     <string name="nc_lobby_start_date">Selle kohtumise algusaeg on %1$s</string>
     <string name="nc_lobby_start_soon">Kohtumine algab õige pea</string>
     <string name="nc_lobby_waiting">Sa asud hetkel ooteruumis</string>
+    <string name="nc_local_network_permission_denied">Ühendamiseks selle serveriga luba ligipääs kohtvõrgule.</string>
+    <string name="nc_local_network_permission_message">See server asub sinu kohtvõrgus. Ta on leitav siis, kui „Lähedalasuvad seadmed“ õigus on lubatud. Ilma selleta ühendamine ei toimi.</string>
+    <string name="nc_local_network_permission_title">Luba ligipääs kohtvõrgule</string>
     <string name="nc_location_current_position_description">Sinu praegune asukoht</string>
     <string name="nc_location_unknown">Asukoht pole teada</string>
     <string name="nc_locked">Lukus</string>
@@ -540,6 +551,10 @@
     <string name="nc_screen_lock_timeout_sixty">60</string>
     <string name="nc_screen_lock_timeout_thirty">30</string>
     <string name="nc_screen_lock_timeout_three_hundred">300</string>
+    <string name="nc_screen_sharing_failed">Ekraanivaate jagamise alustamine ei õnnestunud</string>
+    <string name="nc_screen_sharing_not_allowed">Sul pole õigust jagada ekraanivaadet</string>
+    <string name="nc_screen_sharing_not_connected">Võid oma ekraanivaadet jagada niipea, kui kõne on ühendatud</string>
+    <string name="nc_screen_sharing_permissions_missing">Ekraanivaate jagamiseks luba teavitused ja ligipääs mikrofonile</string>
     <string name="nc_search">Otsi</string>
     <string name="nc_search_clear">Tühjenda otsing</string>
     <string name="nc_search_location">Otsi asukohta</string>
@@ -599,7 +614,12 @@
     <string name="nc_settings_notifications_declined">Teavitused pole lubatud</string>
     <string name="nc_settings_notifications_granted">Teavitused on lubatud</string>
     <string name="nc_settings_other_notifications_ringtone">Sõnumid</string>
+<<<<<<< HEAD
     <string name="nc_settings_phone_book_integration_desc">Otsi telefoni kontaktide andmete ja Xenia Talk rakenduse andmete vasteid telefoninumbri alusel</string>
+=======
+    <string name="nc_settings_other_sound">Muu heli…</string>
+    <string name="nc_settings_phone_book_integration_desc">Otsi telefoni kontaktide andmete ja Nextcloud Talk rakenduse andmete vasteid telefoninumbri alusel</string>
+>>>>>>> upstream/master
     <string name="nc_settings_phone_book_integration_phone_number_dialog_429">Viga 429 - liiga palju päringuid</string>
     <string name="nc_settings_phone_book_integration_phone_number_dialog_description">Võid lisada oma telefoninumbri, mille alusel teised kasutajad saavad sind leida</string>
     <string name="nc_settings_phone_book_integration_phone_number_dialog_edit_text_hint">Sisesta telefoninumber</string>
@@ -656,6 +676,7 @@
     <string name="nc_shared_items_deck_card">Kanbani kaart</string>
     <string name="nc_shared_items_description">Pildid, failid, häälsõnumid…</string>
     <string name="nc_shared_items_empty">Jaosmeediat ei leidu</string>
+    <string name="nc_shared_items_error">Jagatud objektide laadimine ei õnnestunud</string>
     <string name="nc_shared_items_location">Asukoht</string>
     <string name="nc_shared_location">Jagatud asukoht</string>
     <string name="nc_shortcut_conversation_deleted">Seda vestlust pole enam olemas</string>
@@ -668,6 +689,8 @@
     <string name="nc_start_group_chat">Alusta rühmavestlust</string>
     <string name="nc_start_screen_sharing">Jaga ekraanivaadet</string>
     <string name="nc_start_time">Algusaeg</string>
+    <string name="nc_stop_screen_sharing">Lõpeta ekraanivaate jagamine</string>
+    <string name="nc_stop_screen_sharing_confirm_message">Kas sa kindlasti tahad lõpetada ekraanivaate jagamist?</string>
     <string name="nc_switch_account">Vaheta kasutajakontot</string>
     <string name="nc_take_video">Filmi</string>
     <string name="nc_team">Tiim</string>
@@ -693,6 +716,7 @@
     <string name="nc_voice_message">Häälsõnum</string>
     <string name="nc_voice_message_hold_to_record_info">Salvestamiseks hoia nupp all ja saatmiseks vabasta nupp</string>
     <string name="nc_voice_message_missing_audio_permission">Vajalikud on õigused heli salvestamiseks</string>
+    <string name="nc_voice_message_recording_interrupted">Salvestamine lõppes</string>
     <string name="nc_voice_message_slide_to_cancel">« Katkestamiseks viipa</string>
     <string name="nc_webinar">Veebiseminar</string>
     <string name="nc_webinar_description">Piiratud vestlus, mis kasutab ooteruumi. Sobib hästi avalike veebiseminaride jaoks</string>
@@ -787,13 +811,13 @@
     <string name="scope_private_title">Privaatne</string>
     <string name="scope_published_description">Sünkrooni usaldusväärsetesse serveritesse ning üldisesse ja avalikku aadressiraamatusse</string>
     <string name="scope_published_title">Avaldatud</string>
-    <string name="scope_toggle_description">Muuda „%1$s“ vestlue privaatsuse taset</string>
+    <string name="scope_toggle_description">Muuda „%1$s“ vestluse privaatsuse taset</string>
     <string name="scroll_to_bottom">Keri alla äärde</string>
     <string name="search_icon">Otsinguikoon</string>
     <string name="secondsAgo">sekundit tagasi</string>
     <string name="selected_list_item">Valitud</string>
     <string name="send_email">Saada e-kiri</string>
-    <string name="send_to">Saada...</string>
+    <string name="send_to">Saada</string>
     <string name="send_to_forbidden">Sul pole õigust selle vestluse sisu jagada</string>
     <string name="send_to_three_dots">Saada...</string>
     <string name="send_without_notification">Saada ilma teavituseta</string>
@@ -904,5 +928,9 @@
     <plurals name="polls_amount_voters">
         <item quantity="one">%d hääl</item>
         <item quantity="other">%d häält</item>
+    </plurals>
+    <plurals name="nc_conversation_tags_unread_conversations">
+        <item quantity="one">%d vestlus, kus leidub lugemata sõnumeid</item>
+        <item quantity="other">%d vestlust, kus leidub lugemata sõnumeid</item>
     </plurals>
 </resources>

@@ -9,7 +9,6 @@ package com.nextcloud.talk.jobs
 import android.Manifest
 import android.accounts.Account
 import android.accounts.AccountManager
-import android.app.Activity
 import android.content.ContentProviderOperation
 import android.content.Context
 import android.content.OperationApplicationException
@@ -471,7 +470,6 @@ class ContactAddressBookWorker(val context: Context, workerParameters: WorkerPar
 
     companion object {
         const val TAG = "ContactAddressBook"
-        const val REQUEST_PERMISSION = 231
         const val KEY_FORCE = "KEY_FORCE"
         const val DELETE_ALL = "DELETE_ALL"
         const val TAG_UPLOAD = "ContactAddressBookUpload"
@@ -496,6 +494,7 @@ class ContactAddressBookWorker(val context: Context, workerParameters: WorkerPar
             }
         }
 
+<<<<<<< HEAD
         fun enqueueUpload(context: Context, force: Boolean) {
             WorkManager.getInstance(context).enqueue(uploadRequest(force))
         }
@@ -531,6 +530,23 @@ class ContactAddressBookWorker(val context: Context, workerParameters: WorkerPar
                         .setInputData(Data.Builder().putBoolean(DELETE_ALL, true).build())
                         .build()
                 )
+=======
+        /** Synchronizes the address book now, regardless of when it was synchronized last. */
+        fun syncNow(workManager: WorkManager) {
+            workManager.enqueue(
+                OneTimeWorkRequest.Builder(ContactAddressBookWorker::class.java)
+                    .setInputData(Data.Builder().putBoolean(KEY_FORCE, true).build())
+                    .build()
+            )
+        }
+
+        fun deleteAll(workManager: WorkManager) {
+            workManager.enqueue(
+                OneTimeWorkRequest.Builder(ContactAddressBookWorker::class.java)
+                    .setInputData(Data.Builder().putBoolean(DELETE_ALL, true).build())
+                    .build()
+            )
+>>>>>>> upstream/master
         }
     }
 }

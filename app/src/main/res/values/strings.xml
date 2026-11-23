@@ -52,6 +52,7 @@ How to translate with transifex:
     <string name="nc_deep_link_join">Join</string>
     <string name="nc_contact_chat_start_title">Start conversation?</string>
     <string name="nc_contact_chat_start_message">You have no conversation with %1$s yet. Starting one adds it to the conversation list of both of you.</string>
+    <!-- Verb: confirm button of the "Start conversation?" dialog. It starts the conversation with the contact. -->
     <string name="nc_contact_chat_start">Start</string>
 
     <!-- Bottom Navigation -->
@@ -130,6 +131,7 @@ How to translate with transifex:
     <string name="nc_settings_other_notifications_ringtone">Messages</string>
     <string name="nc_settings_default_ringtone" translatable="false">Librem by feandesign</string>
     <string name="nc_settings_no_ringtone">No sound</string>
+    <string name="nc_settings_other_sound">Other sound…</string>
     <string name="nc_settings_server_notification_app_not_installed_title">Server notifications app not installed</string>
     <string name="nc_settings_contact_admin_of">Please contact the administrator of</string>
     <string name="battery_optimization_title">Battery settings</string>
@@ -169,7 +171,6 @@ How to translate with transifex:
     <string name="nc_file_permission_view_only">View-only</string>
     <string name="nc_file_permission_editable">Editable</string>
     <string name="nc_close_video_playback">Close video playback</string>
-    <string name="nc_settings_read_privacy_key" translatable="false">read_privacy</string>
     <string name="nc_locked_tap_to_unlock">Tap to unlock</string>
     <string name="nc_locked">Locked</string>
     <string name="nc_settings_read_privacy_desc">Share my read-status and show the read-status of others</string>
@@ -215,7 +216,6 @@ How to translate with transifex:
     <string name="nc_settings_diagnosis_logs_section_title">Diagnosis &amp; Logs</string>
     <string name="nc_settings_diagnosis_subtitle">Open diagnosis screen to check settings</string>
     <string name="nc_settings_logs_title">Logs</string>
-    <string name="nc_settings_logs_subtitle">View local log files</string>
     <string name="nc_settings_share_report_title">Share diagnosis report</string>
     <string name="nc_settings_share_report_subtitle">Share the logs and diagnosis info</string>
 
@@ -362,6 +362,7 @@ How to translate with transifex:
     <string name="renamed_conversation">Conversation %1$s was renamed</string>
 
     <string name="nc_forward_to_three_dots">Forward to …</string>
+    <string name="nc_forward_to">Forward to</string>
 
     <!-- Open conversations -->
     <string name="nc_no_open_conversations_headline">No open conversations</string>
@@ -384,6 +385,9 @@ How to translate with transifex:
     <string name="nc_microphone_permission_hint">To enable voice communication please grant \"Microphone\" permission.</string>
     <string name="nc_bluetooth_permission_hint">To enable bluetooth speakers please grant \"Nearby devices\" permission.</string>
     <string name="nc_notification_permission_hint">To show call notifications and keep calls active in the background, please grant \"Notifications\" permission.</string>
+    <string name="nc_local_network_permission_title">Allow local network access</string>
+    <string name="nc_local_network_permission_message">This server is on your local network. It can only be reached with the \"Nearby devices\" permission. Without it, connecting to the server fails.</string>
+    <string name="nc_local_network_permission_denied">Allow local network access to connect to this server.</string>
     <string name="nc_microphone_enabled_audio_recording">Microphone is enabled and audio is recording</string>
 
     <!-- Call -->
@@ -419,6 +423,10 @@ How to translate with transifex:
     <string name="nc_call_button_content_description_switch_camera">Switch camera</string>
     <string name="nc_call_self_video_enlarge">Enlarge self video</string>
     <string name="nc_call_self_video_shrink">Shrink self video</string>
+    <string name="nc_call_view_mode">Call view mode</string>
+    <string name="nc_call_view_mode_grid">Grid view</string>
+    <string name="nc_call_view_mode_speaker">Speaker view</string>
+    <string name="nc_call_view_mode_speaker_with_participant_bar">Speaker view with participant bar</string>
     <string name="nc_call_raised_hand">%1$s raised the hand</string>
     <string name="raise_hand">Raise hand</string>
     <string name="lower_hand">Lower hand</string>
@@ -543,6 +551,8 @@ How to translate with transifex:
     <string name="nc_message_quote_cancel_reply">Cancel reply</string>
     <!-- When translating to German, please use non-formal variant -->
     <string name="nc_formatted_message_you">You: %1$s</string>
+    <!-- Author prefix shown before an attachment in the conversation list. When translating to German, please use non-formal variant -->
+    <string name="nc_formatted_message_you_prefix">You:</string>
     <string name="nc_draft_prefix">Draft: %1$s</string>
     <string name="nc_message_sent">Message sent</string>
     <string name="nc_message_read">Message read</string>
@@ -647,6 +657,7 @@ How to translate with transifex:
     <string name="nc_room_retention">Room is retained successfully</string>
 
     <string name="share">Share</string>
+    <!-- Used as search hint when picking the conversation (one-to-one or group) to send shared content to, and as title of the Android share dialog when sharing from Talk to another app. -->
     <string name="send_to">Send to</string>
     <string name="send_to_three_dots">Send to …</string>
     <string name="read_storage_no_permission">Sharing files from storage is not possible without permissions</string>
@@ -726,6 +737,7 @@ How to translate with transifex:
     <string name="nc_voice_message">Voice message</string>
     <string name="nc_voice_message_filename" translatable="false">Talk recording from %1$s (%2$s)</string>
     <string name="nc_voice_message_hold_to_record_info">Hold to record, release to send.</string>
+    <string name="nc_voice_message_recording_interrupted">Recording stopped</string>
     <string name="nc_description_record_voice">Record voice message</string>
     <string name="nc_voice_message_slide_to_cancel">« Slide to cancel</string>
     <string name="play_pause_voice_message">Play/pause voice message</string>
@@ -871,6 +883,7 @@ How to translate with transifex:
     <string name="nc_shared_items">Shared items</string>
     <string name="nc_shared_items_description">Images, files, voice messages …</string>
     <string name="nc_shared_items_empty">No shared items</string>
+    <string name="nc_shared_items_error">Shared items could not be loaded</string>
     <string name="shared_items_media">Media</string>
     <string name="shared_items_file">File</string>
     <string name="shared_items_recording">Call recording</string>
@@ -944,6 +957,7 @@ How to translate with transifex:
     <string name="nc_classified_conversation_description">Locked down conversation for confidential topics, with public access, guests, SIP and recordings disabled</string>
     <string name="nc_conversation_type_defaults">Default settings of this conversation type:</string>
     <string name="nc_conversation_type_defaults_hint">These settings can be changed once the conversation is created</string>
+    <!-- %1$s is a duration from nc_expire_message_*: "4 weeks", "1 week", "1 day", "8 hours" or "1 hour". These strings are also shown on their own in the message expiration setting. -->
     <string name="nc_conversation_type_message_expiration">Messages expire after %1$s</string>
     <string name="nc_conversation_type_message_expiration_custom">Message expiration is enabled</string>
     <string name="nc_conversation_type_lobby">Lobby enabled, restricting the conversation to moderators</string>
@@ -967,10 +981,12 @@ How to translate with transifex:
     <string name="nc_federation_invitation_reject">Reject</string>
     <string name="nc_federation_pending_invitation_hint">You have pending invitations</string>
     <string name="nc_federation_no_invitations">No pending invitations</string>
+    <string name="nc_federated_user">Federated user</string>
 
     <string name="nc_not_allowed_to_activate_audio">You are not allowed to activate audio!</string>
     <string name="nc_not_allowed_to_activate_video">You are not allowed to activate video!</string>
     <string name="scroll_to_bottom">Scroll to bottom</string>
+    <string name="nc_call_participant_bar_scroll_to_start">Scroll to first participant</string>
     <string name="translate">Translate</string>
     <string name="translation">Translation</string>
     <string name="translation_from">From</string>
@@ -988,7 +1004,6 @@ How to translate with transifex:
     <string name="nc_settings_http_value" translatable="false">3128</string>
     <string name="nc_settings_direct_value" translatable="false">8080</string>
     <string name="nc_settings_socks_value" translatable="false">1080</string>
-    <string name="this_is_a_test_message">This is a test message</string>
     <string name="continuous_voice_message_recording">Lock recording for continuously recording of the voice message</string>
     <string name="nc_remind">Remind me later</string>
     <string name="next_week">Next week</string>
@@ -1036,6 +1051,10 @@ How to translate with transifex:
     <string name="archive_hint">Once a conversation is archived, it will be hidden by default. Select the filter \"Archived\" to view archived conversations. Direct mentions will still be received.</string>
     <string name="unarchive_hint">Once a conversation is unarchived, it will be shown by default again.</string>
     <string name="nc_conversation_tags_filter_all">All</string>
+    <plurals name="nc_conversation_tags_unread_conversations">
+        <item quantity="one">%d conversation with unread messages</item>
+        <item quantity="other">%d conversations with unread messages</item>
+    </plurals>
     <string name="nc_conversation_tags">Tags</string>
     <string name="nc_conversation_tags_manage">Manage tags</string>
     <string name="nc_conversation_tags_new">New tag</string>

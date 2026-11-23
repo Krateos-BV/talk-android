@@ -66,6 +66,26 @@ class DummyChatMessagesDaoImpl : ChatMessagesDao {
         /* */
     }
 
+    override suspend fun updateThreadReplies(internalConversationId: String, threadId: Long, threadReplies: Int) {
+        /* */
+    }
+
+    override fun observeThreadReplies(internalConversationId: String, threadId: Long): Flow<Int?> = flowOf()
+
+    override suspend fun getThreadMessageEntities(
+        internalConversationId: String,
+        messageIds: List<Long>
+    ): List<ChatMessageEntity> = emptyList()
+
+    override suspend fun markAsThreadRoot(
+        internalConversationId: String,
+        threadId: Long,
+        threadTitle: String?,
+        threadReplies: Int
+    ) {
+        /* */
+    }
+
     override suspend fun hasServerCopyOfReferenceId(internalConversationId: String, referenceId: String): Boolean =
         false
 
@@ -177,8 +197,6 @@ class DummyChatMessagesDaoImpl : ChatMessagesDao {
         oldestMessageId: Long,
         newestMessageId: Long
     ): Long? = null
-
-    override fun getNumberOfThreadReplies(internalConversationId: String, threadId: Long): Int = 0
 }
 
 class DummyUserDaoImpl : UsersDao {
@@ -321,6 +339,10 @@ class DummyConversationDaoImpl : ConversationsDao {
     }
 
     override suspend fun updateUnreadMessages(internalId: String, unreadMessages: Int) {
+        /* */
+    }
+
+    override suspend fun updateLastCommonRead(internalId: String, lastCommonReadMessage: Int) {
         /* */
     }
 

@@ -178,6 +178,8 @@
     <string name="nc_call_ongoing_notification_default_title">Chamada em andamento</string>
     <string name="nc_call_ongoing_notification_end_action">Encerrar chamada</string>
     <string name="nc_call_ongoing_notification_return_action">Voltar à chamada</string>
+    <string name="nc_call_ongoing_notification_screen_sharing">Você está compartilhando sua tela</string>
+    <string name="nc_call_participant_bar_scroll_to_start">Role a tela até o primeiro participante</string>
     <string name="nc_call_raised_hand">%1$s levantou a mão</string>
     <string name="nc_call_reconnecting">Reconectando …</string>
     <string name="nc_call_ringing">TOCANDO</string>
@@ -189,6 +191,10 @@
     <string name="nc_call_timeout">45 segundos sem resposta, toque para retentar</string>
     <string name="nc_call_unknown">%s chamada</string>
     <string name="nc_call_video">%s chamada de vídeo</string>
+    <string name="nc_call_view_mode">Modo de visualização de chamadas</string>
+    <string name="nc_call_view_mode_grid">Visualização em grade</string>
+    <string name="nc_call_view_mode_speaker">Visualização de palestrante</string>
+    <string name="nc_call_view_mode_speaker_with_participant_bar">Visualização de palestrante com barra de participantes</string>
     <string name="nc_call_voice">%s chamada de voz</string>
     <string name="nc_camera_permission_hint">Para ativar a comunicação por vídeo, por favor, conceda a permissão \"Câmera\".</string>
     <string name="nc_cancel">Cancelar</string>
@@ -329,6 +335,7 @@
     <string name="nc_expire_messages">Deixar as mensagens de bate-papo expirarem</string>
     <string name="nc_expire_messages_explanation">As mensagens de bate-papo podem expirar após um certo tempo. Observação: os arquivos compartilhados no bate-papo não serão excluídos para o proprietário, mas não serão mais compartilhados na conversa.</string>
     <string name="nc_external_server_failed">Falha ao buscar configurações de sinalização</string>
+    <string name="nc_federated_user">Usuário federado</string>
     <string name="nc_federation_invitation_accept">Aceitar</string>
     <string name="nc_federation_invitation_reject">Rejeitar</string>
     <string name="nc_federation_invited_to_room">de %1$s em %2$s</string>
@@ -342,6 +349,7 @@
     <string name="nc_following_link">Usuário seguindo um link público</string>
     <string name="nc_formatted_message_you">Você: %1$s</string>
     <string name="nc_forward_message">Encaminhar</string>
+    <string name="nc_forward_to">Encaminhar para</string>
     <string name="nc_forward_to_three_dots">Encaminhar para …</string>
     <string name="nc_gallery">Galeria</string>
     <string name="nc_get_from_provider">Não tem servidor ainda?\nClique aqui para obter um</string>
@@ -385,6 +393,9 @@
     <string name="nc_lobby_start_date">Esta reunião está agendada para %1$s</string>
     <string name="nc_lobby_start_soon">A reunião vai começar em breve</string>
     <string name="nc_lobby_waiting">No momento, você está esperando na sala de espera.</string>
+    <string name="nc_local_network_permission_denied">Permita o acesso à rede local para se conectar a este servidor.</string>
+    <string name="nc_local_network_permission_message">Este servidor está na sua rede local. Só é possível acessá-lo com a permissão “Dispositivos próximos”. Sem ela, a conexão com o servidor falha.</string>
+    <string name="nc_local_network_permission_title">Permitir acesso à rede local</string>
     <string name="nc_location_current_position_description">Sua localização atual</string>
     <string name="nc_location_unknown">Posição desconhecida</string>
     <string name="nc_locked">Trancado</string>
@@ -540,6 +551,10 @@
     <string name="nc_screen_lock_timeout_sixty">60</string>
     <string name="nc_screen_lock_timeout_thirty">30</string>
     <string name="nc_screen_lock_timeout_three_hundred">300</string>
+    <string name="nc_screen_sharing_failed">Não foi possível iniciar o compartilhamento de tela</string>
+    <string name="nc_screen_sharing_not_allowed">Não é permitido compartilhar sua tela</string>
+    <string name="nc_screen_sharing_not_connected">Você pode compartilhar sua tela assim que a chamada for estabelecida</string>
+    <string name="nc_screen_sharing_permissions_missing">Para compartilhar sua tela, permita as notificações e o acesso ao microfone</string>
     <string name="nc_search">Pesquisar</string>
     <string name="nc_search_clear">Limpar pesquisa</string>
     <string name="nc_search_location">Pesquisar localização</string>
@@ -599,6 +614,7 @@
     <string name="nc_settings_notifications_declined">As notificações foram recusadas</string>
     <string name="nc_settings_notifications_granted">As notificações são concedidas</string>
     <string name="nc_settings_other_notifications_ringtone">Mensagens</string>
+    <string name="nc_settings_other_sound">Outro som…</string>
     <string name="nc_settings_phone_book_integration_desc">Combinar os contatos com base no número de telefone para integrar o atalho do Talk no aplicativo de contatos do sistema</string>
     <string name="nc_settings_phone_book_integration_phone_number_dialog_429">Erro 429 Pedidos Em Excesso</string>
     <string name="nc_settings_phone_book_integration_phone_number_dialog_description">Você pode definir seu número de telefone para que outros usuários possam encontrar você</string>
@@ -656,6 +672,7 @@
     <string name="nc_shared_items_deck_card">Cartão de Deck</string>
     <string name="nc_shared_items_description">Imagens, arquivos, mensagens de voz …</string>
     <string name="nc_shared_items_empty">Nenhum item compartilhado</string>
+    <string name="nc_shared_items_error">Não foi possível carregar os itens compartilhados</string>
     <string name="nc_shared_items_location">Localização</string>
     <string name="nc_shared_location">Localização compartilhada</string>
     <string name="nc_shortcut_conversation_deleted">Esta conversa não existe mais</string>
@@ -668,6 +685,8 @@
     <string name="nc_start_group_chat">Iniciar bate-papo em grupo</string>
     <string name="nc_start_screen_sharing">Compartilhar tela</string>
     <string name="nc_start_time">Hora de início</string>
+    <string name="nc_stop_screen_sharing">Interromper o compartilhamento de tela</string>
+    <string name="nc_stop_screen_sharing_confirm_message">Você realmente quer interromper o compartilhamento da tela?</string>
     <string name="nc_switch_account">Mudar de conta</string>
     <string name="nc_take_video">Gravar um vídeo</string>
     <string name="nc_team">Equipe</string>
@@ -693,6 +712,7 @@
     <string name="nc_voice_message">Mensagem de voz</string>
     <string name="nc_voice_message_hold_to_record_info">Segure para gravar, solte para enviar.</string>
     <string name="nc_voice_message_missing_audio_permission">A permissão para gravação de áudio é necessária</string>
+    <string name="nc_voice_message_recording_interrupted">A gravação foi interrompida</string>
     <string name="nc_voice_message_slide_to_cancel">« Deslize para cancelar</string>
     <string name="nc_webinar">Webinário</string>
     <string name="nc_webinar_description">Conversa restrita com a sala de espera ativada, ideal para webinários públicos</string>
@@ -909,5 +929,10 @@
         <item quantity="one">%d voto</item>
         <item quantity="many">%d votos</item>
         <item quantity="other">%d votos</item>
+    </plurals>
+    <plurals name="nc_conversation_tags_unread_conversations">
+        <item quantity="one">%d conversa com mensagens não lidas</item>
+        <item quantity="many">%d de conversas com mensagens não lidas</item>
+        <item quantity="other">%d conversas com mensagens não lidas</item>
     </plurals>
 </resources>
