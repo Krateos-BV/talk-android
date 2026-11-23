@@ -95,6 +95,7 @@ import com.nextcloud.talk.ui.StatusDrawable
 import com.nextcloud.talk.ui.theme.ViewThemeUtils
 import com.nextcloud.talk.users.DefaultAccountProvider
 import com.nextcloud.talk.users.UserManager
+import com.nextcloud.talk.utils.AccountUtils
 import com.nextcloud.talk.utils.ApiUtils
 import com.nextcloud.talk.utils.CapabilitiesUtil
 import com.nextcloud.talk.utils.DisplayUtils
@@ -213,11 +214,11 @@ class ChooseAccountDialogCompose {
                 },
                 onEcosystemFilesClick = {
                     shouldDismiss.value = true
-                    openEcosystemFiles(currentUser)
+                    openEcosystemFiles(activity, currentUser)
                 },
                 onEcosystemNotesClick = {
                     shouldDismiss.value = true
-                    openEcosystemNotes(currentUser)
+                    openEcosystemNotes(activity, currentUser)
                 },
                 onEcosystemMoreClick = {
                     shouldDismiss.value = true
@@ -294,15 +295,25 @@ class ChooseAccountDialogCompose {
         activity.startActivity(intent)
     }
 
+<<<<<<< HEAD
     private fun openEcosystemFiles(currentUser: User) {
         ecosystemLauncher.openApp(XeniaEcosystemApp.FILES, getAccountHandle(currentUser))
     }
 
     private fun openEcosystemNotes(currentUser: User) {
         ecosystemLauncher.openApp(XeniaEcosystemApp.NOTES, getAccountHandle(currentUser))
+=======
+    private fun openEcosystemFiles(activity: Activity, currentUser: User) {
+        ecosystemManager.openApp(EcosystemApp.FILES, getAccountHandle(activity, currentUser))
     }
 
-    private fun getAccountHandle(user: User): String = user.username + "@" + user.baseUrl?.toUri()?.host
+    private fun openEcosystemNotes(activity: Activity, currentUser: User) {
+        ecosystemManager.openApp(EcosystemApp.NOTES, getAccountHandle(activity, currentUser))
+>>>>>>> upstream/master
+    }
+
+    private fun getAccountHandle(activity: Activity, user: User): String? =
+        AccountUtils.findFilesAccountName(activity, user) ?: AccountUtils.buildAccountName(user)
 
     private fun openEcosystemMore(activity: Activity) {
         LinkHelper.openAppStore("XeniaCloud", true, activity)

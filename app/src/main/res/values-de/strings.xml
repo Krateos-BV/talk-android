@@ -178,6 +178,8 @@
     <string name="nc_call_ongoing_notification_default_title">Anruf ist aktiv</string>
     <string name="nc_call_ongoing_notification_end_action">Anruf beenden</string>
     <string name="nc_call_ongoing_notification_return_action">Zurück zum Anruf</string>
+    <string name="nc_call_ongoing_notification_screen_sharing">Sie teilen Ihren Bildschirm</string>
+    <string name="nc_call_participant_bar_scroll_to_start">Zum ersten Teilnehmer scrollen</string>
     <string name="nc_call_raised_hand">%1$s hat die Hand gehoben</string>
     <string name="nc_call_reconnecting">Verbinde erneut …</string>
     <string name="nc_call_ringing">KLINGELT</string>
@@ -189,6 +191,10 @@
     <string name="nc_call_timeout">Keine Antwort nach 45 Sekunden, klicken, um es erneut zu versuchen</string>
     <string name="nc_call_unknown">%s Anruf</string>
     <string name="nc_call_video">%s Videoanruf</string>
+    <string name="nc_call_view_mode">Anrufansichtsmodus</string>
+    <string name="nc_call_view_mode_grid">Kachelansicht</string>
+    <string name="nc_call_view_mode_speaker">Sprecheransicht</string>
+    <string name="nc_call_view_mode_speaker_with_participant_bar">Sprecheransicht mit Teilnehmerleiste</string>
     <string name="nc_call_voice">%s Sprachanruf</string>
     <string name="nc_camera_permission_hint">Um Videokommunikation zu ermöglichen, bitte die Berechtigung \"Kamera\" erteilen.</string>
     <string name="nc_cancel">Abbrechen</string>
@@ -231,6 +237,7 @@
     <string name="nc_confirm">Bestätigen</string>
     <string name="nc_connecting_call">Verbinde …</string>
     <string name="nc_contact_chat_start">Start</string>
+    <string name="nc_contact_chat_start_message">Sie haben noch keine Unterhaltung mit %1$s geführt. Wenn Sie eine starten, wird sie zur Unterhaltungsliste von beiden hinzugefügt.</string>
     <string name="nc_contact_chat_start_title">Unterhaltung beginnen?</string>
     <string name="nc_contacts_done">Fertig</string>
     <string name="nc_conversation_created_invalid_participants">Einige Teilnehmer konnten nicht hinzugefügt werden</string>
@@ -279,6 +286,7 @@
     <string name="nc_date_header_today">Heute</string>
     <string name="nc_date_header_yesterday">Gestern</string>
     <string name="nc_deep_link_join">Beitreten</string>
+    <string name="nc_deep_link_join_message">Diese Unterhaltung auf %1$s ist nicht in Ihrer Unterhaltungsliste. Durch öffnen, werden Sie möglicherweise als Teilnehmer hinzugefügt.</string>
     <string name="nc_deep_link_join_title">Der Unterhaltung beitreten?</string>
     <string name="nc_delete">Löschen</string>
     <string name="nc_delete_all">Alle löschen</string>
@@ -327,6 +335,7 @@
     <string name="nc_expire_messages">Chatnachrichten ablaufen lassen</string>
     <string name="nc_expire_messages_explanation">Chatnachrichten können nach einer bestimmten Zeit gelöscht werden. Hinweis: Im Chat freigegebene Dateien werden für den Besitzer nicht gelöscht, aber sie werden nicht mehr in der Unterhaltung freigegeben.</string>
     <string name="nc_external_server_failed">Benachrichtigungseinstellungen konnten nicht abgerufen werden</string>
+    <string name="nc_federated_user">Federated-Benutzer</string>
     <string name="nc_federation_invitation_accept">Annehmen</string>
     <string name="nc_federation_invitation_reject">Ablehnen</string>
     <string name="nc_federation_invited_to_room">von %1$s um %2$s</string>
@@ -340,6 +349,7 @@
     <string name="nc_following_link">Benutzer kommt von einem öffentlichen Link</string>
     <string name="nc_formatted_message_you">Sie: %1$s</string>
     <string name="nc_forward_message">Weiterleiten</string>
+    <string name="nc_forward_to">Weiterleiten an</string>
     <string name="nc_forward_to_three_dots">Weiterleiten an …</string>
     <string name="nc_gallery">Galerie</string>
     <string name="nc_get_from_provider">Sie haben noch keinen Server?\nKlicken Sie hier, um Anbieter zu finden</string>
@@ -383,6 +393,9 @@
     <string name="nc_lobby_start_date">Dieses Treffen ist geplant für %1$s</string>
     <string name="nc_lobby_start_soon">Das Treffen beginnt bald</string>
     <string name="nc_lobby_waiting">Sie warten aktuell in der Lobby.</string>
+    <string name="nc_local_network_permission_denied">Lokalen Netzwerkzugriff zulassen, um eine Verbindung zu diesem Server herzustellen.</string>
+    <string name="nc_local_network_permission_message">Dieser Server befindet sich in Ihrem lokalen Netzwerk. Er ist nur mit der Berechtigung \"Geräte in der Nähe\" erreichbar. Ohne sie schlägt die Verbindung zum Server fehl.</string>
+    <string name="nc_local_network_permission_title">Lokalen Netzwerkzugriff zulassen</string>
     <string name="nc_location_current_position_description">Ihre aktuelle Position</string>
     <string name="nc_location_unknown">Position unbekannt</string>
     <string name="nc_locked">Gesperrt</string>
@@ -538,6 +551,10 @@
     <string name="nc_screen_lock_timeout_sixty">60</string>
     <string name="nc_screen_lock_timeout_thirty">30</string>
     <string name="nc_screen_lock_timeout_three_hundred">300</string>
+    <string name="nc_screen_sharing_failed">Bildschirmfreigabe konnte nicht gestartet werden.</string>
+    <string name="nc_screen_sharing_not_allowed">Sie haben nicht die Berechtigung, Ihren Bildschirm zu teilen</string>
+    <string name="nc_screen_sharing_not_connected">Sobald der Anruf verbunden ist, kann der Bildschirm freigegeben werden</string>
+    <string name="nc_screen_sharing_permissions_missing">Um den Bildschirm zu teilen, bitte Benachrichtigungen und Mikrofonzugriff zulassen</string>
     <string name="nc_search">Suchen</string>
     <string name="nc_search_clear">Suche löschen</string>
     <string name="nc_search_location">Suchort</string>
@@ -597,6 +614,7 @@
     <string name="nc_settings_notifications_declined">Benachrichtigungen werden abgelehnt</string>
     <string name="nc_settings_notifications_granted">Benachrichtigungen werden gewährt</string>
     <string name="nc_settings_other_notifications_ringtone">Nachrichten</string>
+    <string name="nc_settings_other_sound">Anderer Klang …</string>
     <string name="nc_settings_phone_book_integration_desc">Abgleich von Kontakten basierend auf der Telefonnummer zur Integration der Talk-Verknüpfung im Telefonbuch</string>
     <string name="nc_settings_phone_book_integration_phone_number_dialog_429">Fehler 429: Zu viele Anfragen</string>
     <string name="nc_settings_phone_book_integration_phone_number_dialog_description">Sie können Ihre Telefonnummer so einstellen, dass andere Benutzer Sie finden können.</string>
@@ -654,16 +672,21 @@
     <string name="nc_shared_items_deck_card">Deck-Karte</string>
     <string name="nc_shared_items_description">Bilder, Dateien, Sprachnachrichten …</string>
     <string name="nc_shared_items_empty">Keine geteilten Elemente</string>
+    <string name="nc_shared_items_error">Geteilte Elemente konnten nicht geladen werden</string>
     <string name="nc_shared_items_location">Ort</string>
     <string name="nc_shared_location">Geteilter Ort</string>
     <string name="nc_shortcut_conversation_deleted">Diese Unterhaltung existiert nicht mehr</string>
+    <string name="nc_shortcut_conversation_not_found">Die Unterhaltung der Verknüpfung wurde nicht gefunden</string>
     <string name="nc_shortcut_created">Tastaturkürzel erstellt</string>
     <string name="nc_show_ecosystem_title">App-Umschalter anzeigen</string>
     <string name="nc_show_notification_warning_description">Wenn Benachrichtigungen nicht korrekt konfiguriert sind, zeige regelmäßig eine Warnung</string>
     <string name="nc_show_notification_warning_title">Zeige regelmäßige Benachrichtigungswarnung</string>
     <string name="nc_sort_by">Sortieren nach</string>
     <string name="nc_start_group_chat">Gruppenchat starten</string>
+    <string name="nc_start_screen_sharing">Bildschirm teilen</string>
     <string name="nc_start_time">Startzeit</string>
+    <string name="nc_stop_screen_sharing">Bildschirmfreigabe beenden</string>
+    <string name="nc_stop_screen_sharing_confirm_message">Soll die Bildschirmfreigabe beendet werden?</string>
     <string name="nc_switch_account">Konto wechseln</string>
     <string name="nc_take_video">Ein Video aufnehmen</string>
     <string name="nc_team">Team</string>
@@ -689,6 +712,7 @@
     <string name="nc_voice_message">Sprachnachricht</string>
     <string name="nc_voice_message_hold_to_record_info">Halten zum Aufnehmen, zum Versenden loslassen.</string>
     <string name="nc_voice_message_missing_audio_permission">Erlaubnis für Audioaufnahmen ist erforderlich</string>
+    <string name="nc_voice_message_recording_interrupted">Anrufaufnahme gestoppt</string>
     <string name="nc_voice_message_slide_to_cancel">« Schieben zum Abbrechen</string>
     <string name="nc_webinar">Online-Seminar</string>
     <string name="nc_webinar_description">Eingeschränkte Unterhaltung mit aktivierter Lobby, ideal für öffentliche Webinare</string>
@@ -900,5 +924,9 @@
     <plurals name="polls_amount_voters">
         <item quantity="one">%d Stimme</item>
         <item quantity="other">%d Stimmen</item>
+    </plurals>
+    <plurals name="nc_conversation_tags_unread_conversations">
+        <item quantity="one">%d Unterhaltung mit ungelesenen Nachrichten</item>
+        <item quantity="other">%d Unterhaltungen mit ungelesenen Nachrichten</item>
     </plurals>
 </resources>

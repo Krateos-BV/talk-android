@@ -21,8 +21,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.res.AssetFileDescriptor
-import android.database.Cursor
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -82,8 +80,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequest
-import com.nextcloud.talk.dagger.modules.assistedViewModels
-import com.nextcloud.talk.utils.setExpeditedIfSupported
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import autodagger.AutoInjector
@@ -127,6 +123,7 @@ import com.nextcloud.talk.chat.viewmodels.MessageInputViewModel
 import com.nextcloud.talk.conversationinfo.ConversationInfoActivity
 import com.nextcloud.talk.conversationinfo.viewmodel.ConversationInfoViewModel
 import com.nextcloud.talk.conversationlist.ConversationsListActivity
+import com.nextcloud.talk.dagger.modules.assistedViewModels
 import com.nextcloud.talk.data.database.model.SendStatus
 import com.nextcloud.talk.data.network.NetworkMonitor
 import com.nextcloud.talk.data.user.model.User
@@ -186,7 +183,6 @@ import com.nextcloud.talk.utils.CapabilitiesUtil.retentionOfClassifiedRoom
 import com.nextcloud.talk.utils.CapabilitiesUtil.retentionOfEventRooms
 import com.nextcloud.talk.utils.CapabilitiesUtil.retentionOfInstantMeetingRoom
 import com.nextcloud.talk.utils.CapabilitiesUtil.retentionOfSIPRoom
-import com.nextcloud.talk.utils.ContactUtils
 import com.nextcloud.talk.utils.ConversationUtils
 import com.nextcloud.talk.utils.ConversationUtils.checkIfVoiceRoom
 import com.nextcloud.talk.utils.DateConstants
@@ -217,6 +213,7 @@ import com.nextcloud.talk.utils.bundle.BundleKeys.KEY_THREAD_ID
 import com.nextcloud.talk.utils.keepContentOutOfDisplayCutout
 import com.nextcloud.talk.utils.permissions.PlatformPermissionUtil
 import com.nextcloud.talk.utils.rx.DisposableSet
+import com.nextcloud.talk.utils.setExpeditedIfSupported
 import com.nextcloud.talk.utils.singletons.ApplicationWideCurrentRoomHolder
 import com.nextcloud.talk.webrtc.Globals
 import com.nextcloud.talk.webrtc.WebSocketConnectionHelper
@@ -227,13 +224,13 @@ import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -241,6 +238,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
 import java.io.File
@@ -309,6 +307,10 @@ class ChatActivity :
             roomToken,
             conversationThreadId
         )
+    }
+
+    private val voiceRecordingInterrupter = VoiceRecordingInterrupter(this) {
+        chatViewModel.interruptAudioRecording()
     }
 
     lateinit var conversationInfoViewModel: ConversationInfoViewModel
@@ -392,6 +394,9 @@ class ChatActivity :
 
     var openedViaNotification: Boolean = false
     var conversationThreadInfo: ThreadInfoDto? = null
+
+    // Reply count of the open thread from its cached messages, which follows the chat while it is open
+    private var cachedThreadReplies: Int? = null
     val conversationUser: User
         get() = chatViewModel.currentUser
     lateinit var spreedCapabilities: SpreedCapabilityDto
@@ -637,6 +642,7 @@ class ChatActivity :
         if (isSharedTextTaken) sharedText = ""
         if (areSharedFilesTaken) sharedFilePaths = emptyList()
         chatViewModel.initData()
+        voiceRecordingInterrupter.register()
         if (sharedText.isNotEmpty()) {
             chatViewModel.messageDraft.messageText = sharedText
             chatViewModel.saveMessageDraft()
@@ -1855,6 +1861,13 @@ class ChatActivity :
                 }
             }
         }
+
+        this.lifecycleScope.launch {
+            chatViewModel.cachedThreadReplies.collect { replies ->
+                cachedThreadReplies = replies
+                updateToolbarState()
+            }
+        }
     }
 
     private fun removeUnreadMessagesMarker() {
@@ -2174,7 +2187,9 @@ class ChatActivity :
     private fun buildToolbarSubtitle(conversation: ConversationModel?): String =
         when {
             isChatThread() -> {
-                val count = conversationThreadInfo?.thread?.numReplies ?: 0
+                // The thread endpoint is only asked once when the thread is opened, while the cached messages
+                // follow the chat. A thread's reply count only grows, so the higher of both is the current one.
+                val count = maxOf(conversationThreadInfo?.thread?.numReplies ?: 0, cachedThreadReplies ?: 0)
                 resources.getQuantityString(R.plurals.thread_replies, count, count)
             }
             conversation?.type == ConversationEnums.ConversationType.ROOM_TYPE_ONE_TO_ONE_CALL -> {
@@ -2551,35 +2566,13 @@ class ChatActivity :
 
     private fun onSelectContactResult(intent: Intent?) {
         val contactUri = intent?.data ?: return
-        val cursor: Cursor? = contentResolver!!.query(contactUri, null, null, null, null)
-
-        if (cursor != null && cursor.moveToFirst()) {
-            val id = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts._ID))
-            val fileName = ContactUtils.getDisplayNameFromDeviceContact(context, id) + ".vcf"
-            val file = FileUtils.resolveSharedAttachmentFile(context.cacheDir, fileName)
-            if (file == null) {
-                logger.e(TAG, "Refused to save contact with unsafe name: $fileName")
-                Snackbar.make(binding.root, R.string.nc_common_error_sorry, Snackbar.LENGTH_LONG).show()
-                cursor.close()
-                return
-            }
-            writeContactToVcfFile(cursor, file)
-
-            val shareUri = FileProvider.getUriForFile(
-                this,
-                BuildConfig.APPLICATION_ID,
-                File(file.absolutePath)
-            )
-            uploadFile(
-                fileUri = shareUri.toString(),
-                isVoiceMessage = false,
-                caption = "",
-                roomToken = roomToken,
-                replyToMessageId = getReplyToMessageId(),
-                displayName = currentConversation?.displayName ?: ""
-            )
-        }
-        cursor?.close()
+        chatViewModel.shareContact(
+            contactUri = contactUri,
+            roomToken = roomToken,
+            replyToMessageId = getReplyToMessageId(),
+            displayName = currentConversation?.displayName ?: ""
+        )
+        cancelReply()
     }
 
     fun getReplyToMessageId(): Int =
@@ -2636,23 +2629,6 @@ class ChatActivity :
             onResult(result.data)
         } else {
             Log.e(TAG, "resultCode for received intent was != ok")
-        }
-    }
-
-    private fun writeContactToVcfFile(cursor: Cursor, file: File) {
-        val lookupKey = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts.LOOKUP_KEY))
-        val uri = Uri.withAppendedPath(ContactsContract.Contacts.CONTENT_VCARD_URI, lookupKey)
-
-        val fd: AssetFileDescriptor = contentResolver!!.openAssetFileDescriptor(uri, "r")!!
-        fd.use {
-            val fis = fd.createInputStream()
-
-            file.createNewFile()
-            fis.use { input ->
-                file.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
         }
     }
 
@@ -2890,6 +2866,7 @@ class ChatActivity :
 
     override fun onDestroy() {
         super.onDestroy()
+        voiceRecordingInterrupter.unregister()
 
         if (::initialUser.isInitialized) {
             logConversationInfos("onDestroy")
@@ -3054,10 +3031,14 @@ class ChatActivity :
     }
 
     private fun openScheduledMessages() {
+        val isClassified = currentConversation?.let { conversation ->
+            ::spreedCapabilities.isInitialized && ConversationUtils.isClassified(conversation, spreedCapabilities)
+        } == true
         val intent = Intent(this, ScheduledMessagesActivity::class.java).apply {
             putExtra(ScheduledMessagesActivity.ROOM_TOKEN, roomToken)
             putExtra(KEY_INTERNAL_USER_ID, conversationUserId)
             putExtra(ScheduledMessagesActivity.CONVERSATION_NAME, currentConversation?.displayName.orEmpty())
+            putExtra(ScheduledMessagesActivity.IS_CLASSIFIED, isClassified)
             if (conversationThreadId != null && conversationThreadId!! > 0) {
                 putExtra(ScheduledMessagesActivity.THREAD_ID, conversationThreadId)
                 putExtra(ScheduledMessagesActivity.THREAD_TITLE, conversationThreadInfo?.thread?.title.orEmpty())
@@ -3752,8 +3733,7 @@ class ChatActivity :
         }
     }
 
-    @Suppress("Detekt.TooGenericExceptionCaught")
-    private fun shareToNotes(
+    private suspend fun shareToNotes(
         shareUri: Uri?,
         roomToken: String,
         message: ChatMessage,
@@ -3777,8 +3757,13 @@ class ChatActivity :
             ChatMessage.MessageType.SINGLE_NC_ATTACHMENT_MESSAGE -> {
                 val caption = if (message.message != "{file}") message.message else ""
                 if (null != shareUri) {
-                    try {
-                        context.contentResolver.openInputStream(shareUri)?.close()
+                    val fileIsCached = runProviderCall(
+                        onFailure = { e -> Log.d(TAG, "$shareUri is not cached, downloading it first: ${e.message}") }
+                    ) {
+                        withContext(Dispatchers.IO) { context.contentResolver.openInputStream(shareUri)?.close() }
+                        true
+                    } == true
+                    val uploadToNotes = {
                         uploadFile(
                             fileUri = shareUri.toString(),
                             isVoiceMessage = false,
@@ -3788,19 +3773,11 @@ class ChatActivity :
                             displayName = currentConversation?.displayName ?: ""
                         )
                         showSnackBar(roomToken)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "File corresponding to the uri does not exist $shareUri", e)
-                        downloadFileToCache(message, false) {
-                            uploadFile(
-                                fileUri = shareUri.toString(),
-                                isVoiceMessage = false,
-                                caption = caption!!,
-                                roomToken = roomToken,
-                                replyToMessageId = getReplyToMessageId(),
-                                displayName = currentConversation?.displayName ?: ""
-                            )
-                            showSnackBar(roomToken)
-                        }
+                    }
+                    if (fileIsCached) {
+                        uploadToNotes()
+                    } else {
+                        downloadFileToCache(message, false, uploadToNotes)
                     }
                 }
             }

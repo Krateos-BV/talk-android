@@ -161,6 +161,8 @@
     <string name="nc_call_timeout">Žádná odezva po 45 sekundách, ťukněte, pokud chcete zkusit znovu</string>
     <string name="nc_call_unknown">%s hovor</string>
     <string name="nc_call_video">%s video hovor</string>
+    <string name="nc_call_view_mode_grid">Zobrazení v mřížce</string>
+    <string name="nc_call_view_mode_speaker">Zobrazení řečníka</string>
     <string name="nc_call_voice">%s hlasový hovor</string>
     <string name="nc_camera_permission_hint">Pro zapnutí videokomunikace udělte oprávnění „Kamera“ .</string>
     <string name="nc_cancel">Storno</string>
@@ -274,6 +276,7 @@
     <string name="nc_expire_messages">Ukončit platnost zpráv v chatu</string>
     <string name="nc_expire_messages_explanation">Platnost zpráv v chatu je možné ukončit po uplynutí zadané doby. Pozn.: Soubory nasdílené v chatu nebudou vlastníkovi smazány, ale už nadále nebudou sdíleny v konverzaci.</string>
     <string name="nc_external_server_failed">Nepodařilo se získat nastavení signalizace</string>
+    <string name="nc_federated_user">Federovaný uživatel</string>
     <string name="nc_federation_invitation_accept">Přijmout</string>
     <string name="nc_federation_invitation_reject">Zamítnout</string>
     <string name="nc_federation_invited_to_room">od %1$s v %2$s</string>
@@ -574,6 +577,7 @@
     <string name="nc_show_notification_warning_title">Zobrazovat pravidelné varování ohledně notifikací</string>
     <string name="nc_sort_by">Řadit podle</string>
     <string name="nc_start_group_chat">Zahájit skupinový chat</string>
+    <string name="nc_start_screen_sharing">Sdílet obrazovku</string>
     <string name="nc_start_time">Čas zahájení</string>
     <string name="nc_switch_account">Přepnout účet</string>
     <string name="nc_take_video">Natočit video</string>
@@ -816,4 +820,4 @@
         <item quantity="many">%d hlasů</item>
         <item quantity="other">%d hlasy</item>
     </plurals>
-</resources>
+    </resources>

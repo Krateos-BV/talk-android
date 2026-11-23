@@ -178,6 +178,8 @@
     <string name="nc_call_ongoing_notification_default_title">Prebieha hovor</string>
     <string name="nc_call_ongoing_notification_end_action">Ukončiť hovor</string>
     <string name="nc_call_ongoing_notification_return_action">Návrat k hovoru</string>
+    <string name="nc_call_ongoing_notification_screen_sharing">Zdieľate svoju obrazovku</string>
+    <string name="nc_call_participant_bar_scroll_to_start">Posunúť na prvého účastníka</string>
     <string name="nc_call_raised_hand">%1$s sa prihlásil(a)</string>
     <string name="nc_call_reconnecting">Znovu pripájam …</string>
     <string name="nc_call_ringing">ZVONÍ</string>
@@ -189,6 +191,10 @@
     <string name="nc_call_timeout">Žiadna odpoveď počas 45 sekúnd, ťuknite a skúste znova</string>
     <string name="nc_call_unknown">%s hovor</string>
     <string name="nc_call_video">%s videohovor</string>
+    <string name="nc_call_view_mode">Režim zobrazenia hovoru</string>
+    <string name="nc_call_view_mode_grid">Zobrazenie v mriežke</string>
+    <string name="nc_call_view_mode_speaker">Zobrazenie rečníka</string>
+    <string name="nc_call_view_mode_speaker_with_participant_bar">Zobrazenie rečníka s panelom účastníkov</string>
     <string name="nc_call_voice">%s hlasový hovor</string>
     <string name="nc_camera_permission_hint">Ak chcete povoliť videokomunikáciu, udeľte povolenie „Kamera“.</string>
     <string name="nc_cancel">Zrušiť</string>
@@ -329,6 +335,7 @@
     <string name="nc_expire_messages">Vypršanie platnosti správ v chate</string>
     <string name="nc_expire_messages_explanation">Platnosť četových správ môže po určitom čase vypršať. Poznámka: Súbory zdieľané v čete sa vlastníkovi neodstránia, ale už sa nebudú zdieľať v konverzácii.</string>
     <string name="nc_external_server_failed">Nepodarilo sa načítať nastavenia signalizácie</string>
+    <string name="nc_federated_user">Federovaný používateľ</string>
     <string name="nc_federation_invitation_accept">Prijať</string>
     <string name="nc_federation_invitation_reject">Odmietnuť</string>
     <string name="nc_federation_invited_to_room">od %1$s o %2$s</string>
@@ -342,6 +349,7 @@
     <string name="nc_following_link">Používateľ z verejného odkazu</string>
     <string name="nc_formatted_message_you">Vy: %1$s</string>
     <string name="nc_forward_message">Preposlať</string>
+    <string name="nc_forward_to">Preposlať na</string>
     <string name="nc_forward_to_three_dots">Preposlať na …</string>
     <string name="nc_gallery">Galéria</string>
     <string name="nc_get_from_provider">Ešte nemáte server? \nŤuknite sem a získajte jeden od poskytovateľa</string>
@@ -385,6 +393,9 @@
     <string name="nc_lobby_start_date">Tento rozhovor je naplánovaný na %1$s</string>
     <string name="nc_lobby_start_soon">Stretnutie sa začne čoskoro</string>
     <string name="nc_lobby_waiting">Momentálne čakáte v miestnosti.</string>
+    <string name="nc_local_network_permission_denied">Povoľte prístup k miestnej sieti, aby ste sa mohli pripojiť k tomuto serveru.</string>
+    <string name="nc_local_network_permission_message">Tento server sa nachádza vo vašej miestnej sieti. Je dostupný iba s povolením „Zariadenia v okolí“. Bez neho sa pripojenie k serveru nepodarí.</string>
+    <string name="nc_local_network_permission_title">Povoliť prístup k miestnej sieti</string>
     <string name="nc_location_current_position_description">Vaša súčasná poloha</string>
     <string name="nc_location_unknown">Neznáma poloha</string>
     <string name="nc_locked">Uzamknuté</string>
@@ -540,6 +551,10 @@
     <string name="nc_screen_lock_timeout_sixty">60</string>
     <string name="nc_screen_lock_timeout_thirty">30</string>
     <string name="nc_screen_lock_timeout_three_hundred">300</string>
+    <string name="nc_screen_sharing_failed">Zdieľanie obrazovky sa nepodarilo spustiť</string>
+    <string name="nc_screen_sharing_not_allowed">Nemáte oprávnenie zdieľať svoju obrazovku</string>
+    <string name="nc_screen_sharing_not_connected">Obrazovku môžete zdieľať po spojení hovoru</string>
+    <string name="nc_screen_sharing_permissions_missing">Ak chcete zdieľať obrazovku, povoľte upozornenia a prístup k mikrofónu</string>
     <string name="nc_search">Hľadať</string>
     <string name="nc_search_clear">Vymazať hľadanie</string>
     <string name="nc_search_location">Vyhľadať miesto</string>
@@ -599,6 +614,7 @@
     <string name="nc_settings_notifications_declined">Upozornenia sú odmietnuté</string>
     <string name="nc_settings_notifications_granted">Upozornenia sú povolené</string>
     <string name="nc_settings_other_notifications_ringtone">Správy</string>
+    <string name="nc_settings_other_sound">Iný zvuk …</string>
     <string name="nc_settings_phone_book_integration_desc">Priradiť kontakty podľa telefónneho čísla a integrovať odkaz na Rozhovor do aplikácie systémových kontaktov</string>
     <string name="nc_settings_phone_book_integration_phone_number_dialog_429">Chyba 429 Príliš veľa požiadaviek</string>
     <string name="nc_settings_phone_book_integration_phone_number_dialog_description">Môžete nastaviť svoje telefónne číslo, aby vás ostatní používatelia mohli nájsť</string>
@@ -656,6 +672,7 @@
     <string name="nc_shared_items_deck_card">Karta aplikácie deck</string>
     <string name="nc_shared_items_description">Obrázky, súbory, hlasové správy …</string>
     <string name="nc_shared_items_empty">Žiadne zdieľané položky</string>
+    <string name="nc_shared_items_error">Zdieľané položky sa nepodarilo načítať</string>
     <string name="nc_shared_items_location">Umiestnenie</string>
     <string name="nc_shared_location">Zdieľaná poloha</string>
     <string name="nc_shortcut_conversation_deleted">Táto konverzácia už neexistuje</string>
@@ -666,8 +683,10 @@
     <string name="nc_show_notification_warning_title">Zobraziť štandardné upozornenie</string>
     <string name="nc_sort_by">Zoradiť podľa</string>
     <string name="nc_start_group_chat">Začať skupinový chat</string>
-    <string name="nc_start_screen_sharing">Sprístupniť obrazovku</string>
+    <string name="nc_start_screen_sharing">Zdieľať obrazovku</string>
     <string name="nc_start_time">Čas začiatku</string>
+    <string name="nc_stop_screen_sharing">Zastaviť zdieľanie obrazovky</string>
+    <string name="nc_stop_screen_sharing_confirm_message">Naozaj chcete zastaviť zdieľanie svojej obrazovky?</string>
     <string name="nc_switch_account">Prepnúť účet</string>
     <string name="nc_take_video">Natočiť video</string>
     <string name="nc_team">Tím</string>
@@ -693,6 +712,7 @@
     <string name="nc_voice_message">Hlasová správa</string>
     <string name="nc_voice_message_hold_to_record_info">Podržte pre nahrávanie, uvoľnite pre poslanie.</string>
     <string name="nc_voice_message_missing_audio_permission">Je potrebné oprávnenie pre nahrávanie zvuku.</string>
+    <string name="nc_voice_message_recording_interrupted">Nahrávanie sa zastavilo</string>
     <string name="nc_voice_message_slide_to_cancel">« Potiahnite pre zrušenie</string>
     <string name="nc_webinar">Webinár</string>
     <string name="nc_webinar_description">Obmedzená konverzácia s povoleným lobby, ideálna pre verejné webináre</string>
@@ -914,5 +934,11 @@
         <item quantity="few">%d hlasy</item>
         <item quantity="many">%d hlasov</item>
         <item quantity="other">%d hlasov</item>
+    </plurals>
+    <plurals name="nc_conversation_tags_unread_conversations">
+        <item quantity="one">%d konverzácia s neprečítanými správami</item>
+        <item quantity="few">%d konverzácie s neprečítanými správami</item>
+        <item quantity="many">%d konverzácie s neprečítanými správami</item>
+        <item quantity="other">%d konverzácií s neprečítanými správami</item>
     </plurals>
 </resources>

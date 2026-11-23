@@ -147,6 +147,10 @@ class ScheduledMessagesActivity : BaseActivity() {
         intent.getStringExtra(CONVERSATION_NAME).orEmpty()
     }
 
+    private val isClassified: Boolean by lazy {
+        intent.getBooleanExtra(IS_CLASSIFIED, false)
+    }
+
     private val threadId: Long? by lazy {
         if (intent.hasExtra(THREAD_ID)) {
             intent.getLongExtra(THREAD_ID, 0L)
@@ -324,6 +328,7 @@ class ScheduledMessagesActivity : BaseActivity() {
         onCopyScheduledMessage: (ChatMessage) -> Unit
     ) {
         val snackBarHostState = remember { SnackbarHostState() }
+        val authHeader = remember(user) { ApiUtils.getCredentials(user.username, user.token) }
         val scheduledState by scheduledMessagesViewModel.getScheduledMessagesState.collectAsStateWithLifecycle()
         val sendNowState by scheduledMessagesViewModel.sendNowState.collectAsStateWithLifecycle()
         val rescheduleState by scheduledMessagesViewModel.rescheduleState.collectAsStateWithLifecycle()
@@ -575,10 +580,16 @@ class ScheduledMessagesActivity : BaseActivity() {
                                                 message,
                                                 parentMessage,
                                                 delayedThreadLabel,
-                                                replyToThreadLabel
+                                                replyToThreadLabel,
+                                                authHeader
                                             ) {
-                                                val base =
-                                                    message.toScheduledMessageUiModel(user, roomToken, parentMessage)
+                                                val base = message.toScheduledMessageUiModel(
+                                                    user,
+                                                    roomToken,
+                                                    parentMessage,
+                                                    authHeader,
+                                                    isClassified
+                                                )
                                                 val isThreadReply =
                                                     !isThreadView && (message.threadId ?: 0L) > 0
                                                 when {
@@ -1105,6 +1116,7 @@ class ScheduledMessagesActivity : BaseActivity() {
         const val CONVERSATION_NAME = "conversation_name"
         const val THREAD_ID = "thread_id"
         const val THREAD_TITLE = "thread_title"
+        const val IS_CLASSIFIED = "is_classified"
         const val INT_24: Int = 24
         const val INT_20: Int = 20
     }

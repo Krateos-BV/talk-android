@@ -296,7 +296,7 @@ class MessageInputViewModel :
         _inputState.update {
             it.copy(
                 quotedJsonId = message?.jsonMessageId,
-                quotedDisplayName = message?.actorDisplayName,
+                quotedDisplayName = message?.getNullsafeActorDisplayNameWithServer(),
                 quotedMessageText = message?.getRichText(),
                 quotedImageUrl = "" // TODO
             )
@@ -344,6 +344,14 @@ class MessageInputViewModel :
         audioFocusRequestManager.audioFocusRequest(true) {
             audioRecorderManager.start(context)
         }
+    }
+
+    /**
+     * Starts the mic input again after it was stopped with the lifecycle, which keeps the audio focus: asking for it
+     * again would take it once more on every return to the chat.
+     */
+    fun resumeMicInput(context: Context) {
+        audioRecorderManager.start(context)
     }
 
     fun stopMicInput() {

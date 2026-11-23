@@ -178,6 +178,7 @@
     <string name="nc_call_ongoing_notification_default_title">Samtal pågår</string>
     <string name="nc_call_ongoing_notification_end_action">Avsluta samtal</string>
     <string name="nc_call_ongoing_notification_return_action">Återgå till samtalet</string>
+    <string name="nc_call_ongoing_notification_screen_sharing">Du delar din skärm</string>
     <string name="nc_call_raised_hand">%1$s räckte upp handen</string>
     <string name="nc_call_reconnecting">Återansluter …</string>
     <string name="nc_call_ringing">RINGER</string>
@@ -189,6 +190,10 @@
     <string name="nc_call_timeout">Inget svar på 45 sekunder, tryck för att försöka igen</string>
     <string name="nc_call_unknown">%s samtal</string>
     <string name="nc_call_video">%s videosamtal</string>
+    <string name="nc_call_view_mode">Visningsläge för samtal</string>
+    <string name="nc_call_view_mode_grid">Rutnätsvy</string>
+    <string name="nc_call_view_mode_speaker">Talarvy</string>
+    <string name="nc_call_view_mode_speaker_with_participant_bar">Talarvy med deltagarfält</string>
     <string name="nc_call_voice">%s röstsamtal</string>
     <string name="nc_camera_permission_hint">För att aktivera videokommunikation måste du bevilja \"Kamera\"-tillstånd.</string>
     <string name="nc_cancel">Avbryt</string>
@@ -231,6 +236,8 @@
     <string name="nc_confirm">Bekräfta</string>
     <string name="nc_connecting_call">Ansluter…</string>
     <string name="nc_contact_chat_start">Starta</string>
+    <string name="nc_contact_chat_start_message">Du har ännu ingen konversation med %1$s. Om du startar en läggs den till i konversationslistan för er båda.</string>
+    <string name="nc_contact_chat_start_title">Starta en konversation?</string>
     <string name="nc_contacts_done">Färdig</string>
     <string name="nc_conversation_created_invalid_participants">Vissa deltagare kunde inte läggas till</string>
     <string name="nc_conversation_created_invalid_participants_named">Det gick inte att lägga till följande deltagare: %1$s</string>
@@ -278,6 +285,8 @@
     <string name="nc_date_header_today">Idag</string>
     <string name="nc_date_header_yesterday">Igår</string>
     <string name="nc_deep_link_join">Gå med</string>
+    <string name="nc_deep_link_join_message">Den här konversationen på %1$s finns inte i din konversationslista. Om du öppnar den kan du läggas till som deltagare.</string>
+    <string name="nc_deep_link_join_title">Gå med i konversationen?</string>
     <string name="nc_delete">Ta bort</string>
     <string name="nc_delete_all">Ta bort alla</string>
     <string name="nc_delete_call">Ta bort konversation</string>
@@ -325,6 +334,7 @@
     <string name="nc_expire_messages">Chattmeddelanden löper ut</string>
     <string name="nc_expire_messages_explanation">Chattmeddelanden kan löpa ut efter en viss tid. Notera: Filer som delas i chatten kommer inte att raderas för ägaren, men kommer inte längre att delas i konversationen.</string>
     <string name="nc_external_server_failed">Misslyckades med att hämta signaleringsinställningar</string>
+    <string name="nc_federated_user">Federerad användare</string>
     <string name="nc_federation_invitation_accept">Acceptera</string>
     <string name="nc_federation_invitation_reject">Avvisa</string>
     <string name="nc_federation_invited_to_room">från %1$s på %2$s</string>
@@ -381,6 +391,9 @@
     <string name="nc_lobby_start_date">Det här mötet är planerat till %1$s</string>
     <string name="nc_lobby_start_soon">Mötet börjar snart</string>
     <string name="nc_lobby_waiting">Du väntar för närvarande i lobbyn.</string>
+    <string name="nc_local_network_permission_denied">Tillåt åtkomst till lokalt nätverk för att ansluta till den här servern.</string>
+    <string name="nc_local_network_permission_message">Den här servern finns i ditt lokala nätverk. Den kan endast nås med behörigheten ”Enheter i närheten”. Det går inte att ansluta till servern utan den.</string>
+    <string name="nc_local_network_permission_title">Tillåt åtkomst till lokalt nätverk</string>
     <string name="nc_location_current_position_description">Din nuvarande plats</string>
     <string name="nc_location_unknown">Position okänd</string>
     <string name="nc_locked">Låst</string>
@@ -536,6 +549,10 @@
     <string name="nc_screen_lock_timeout_sixty">60</string>
     <string name="nc_screen_lock_timeout_thirty">30</string>
     <string name="nc_screen_lock_timeout_three_hundred">300</string>
+    <string name="nc_screen_sharing_failed">Kunde inte starta skärmdelning</string>
+    <string name="nc_screen_sharing_not_allowed">Du har inte behörighet att dela din skärm</string>
+    <string name="nc_screen_sharing_not_connected">Du kan dela din skärm när samtalet är anslutet</string>
+    <string name="nc_screen_sharing_permissions_missing">För att dela din skärm, tillåt notiser och åtkomst till mikrofonen</string>
     <string name="nc_search">Sök</string>
     <string name="nc_search_clear">Rensa sökning</string>
     <string name="nc_search_location">Sök plats</string>
@@ -655,6 +672,7 @@
     <string name="nc_shared_items_location">Plats</string>
     <string name="nc_shared_location">Delad plats</string>
     <string name="nc_shortcut_conversation_deleted">Den här konversationen finns inte längre</string>
+    <string name="nc_shortcut_conversation_not_found">Genvägens konversation hittades inte</string>
     <string name="nc_shortcut_created">Genväg skapad</string>
     <string name="nc_show_ecosystem_title">Visa appväxlare</string>
     <string name="nc_show_notification_warning_description">När aviseringar inte är korrekt inställda, visa en vanlig varning</string>
@@ -663,6 +681,8 @@
     <string name="nc_start_group_chat">Starta gruppchatt</string>
     <string name="nc_start_screen_sharing">Dela skärm</string>
     <string name="nc_start_time">Starttid</string>
+    <string name="nc_stop_screen_sharing">Stoppa skärmdelning</string>
+    <string name="nc_stop_screen_sharing_confirm_message">Vill du verkligen sluta dela din skärm?</string>
     <string name="nc_switch_account">Växla konto</string>
     <string name="nc_take_video">Spela in video</string>
     <string name="nc_team">Team</string>
@@ -688,6 +708,7 @@
     <string name="nc_voice_message">Röstmeddelande</string>
     <string name="nc_voice_message_hold_to_record_info">Håll ned för att spela in, släpp för att skicka.</string>
     <string name="nc_voice_message_missing_audio_permission">Tillstånd för ljudinspelning krävs</string>
+    <string name="nc_voice_message_recording_interrupted">Inspelningen stoppades</string>
     <string name="nc_voice_message_slide_to_cancel">« Dra för att avbryta</string>
     <string name="nc_webinar">Webbinarium</string>
     <string name="nc_webinar_description">Begränsad konversation med lobby aktiverad, idealisk för offentliga webbseminarier</string>
@@ -900,4 +921,4 @@
         <item quantity="one">%d röst</item>
         <item quantity="other">%d röster</item>
     </plurals>
-</resources>
+    </resources>

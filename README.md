@@ -13,7 +13,19 @@
 
 Xenia Talk is a fully on-premises audio/video and chat communication service. It features web and mobile apps and is designed to offer the highest degree of security while being easy to use.
 
+<<<<<<< HEAD
 Xenia Talk lowers the barrier for communication and lets your team connect any time, any where, on any device, with each other, customers or partners.
+=======
+|||||||
+|---|---|---|---|---|---|
+|![Cover art](/src/generic/fastlane/metadata/android/en-US/images/phoneScreenshots/01_nextcloudtalkandroid_coverArt.png "Cover art")|![Conversations list](/src/generic/fastlane/metadata/android/en-US/images/phoneScreenshots/02_nextcloudtalkandroid_conversationsList.png "Conversations list")|![Group chat](/src/generic/fastlane/metadata/android/en-US/images/phoneScreenshots/03_nextcloudtalkandroid_groupChat.png "Group chat")|![Call](/src/generic/fastlane/metadata/android/en-US/images/phoneScreenshots/04_nextcloudtalkandroid_call.png "Call")|![Share content](/src/generic/fastlane/metadata/android/en-US/images/phoneScreenshots/05_nextcloudtalkandroid_share.png "Share content")|![Present](/src/generic/fastlane/metadata/android/en-US/images/phoneScreenshots/06_nextcloudtalkandroid_present.png "Present")|
+
+**Video & audio calls through Nextcloud on Android**
+
+Nextcloud Talk is a fully on-premises audio/video and chat communication service. It features web and mobile apps and is designed to offer the highest degree of security while being easy to use.
+
+Nextcloud Talk lowers the barrier for communication and lets your team connect any time, any where, on any device, with each other, customers or partners. 
+>>>>>>> upstream/master
 
 ## Why is this so awesome? :sparkles:
 

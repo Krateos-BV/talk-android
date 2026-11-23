@@ -21,8 +21,8 @@ This file provides guidance to all AI agents (Claude, Codex, Gemini, etc.) worki
 
 All contributions generated or assisted by this agent must fully comply with:
 
-- **[AI Contribution Policy](https://github.com/nextcloud/.github/blob/master/AI_POLICY.md)** — the primary reference for AI-specific rules, covering disclosure, author accountability, communication, security, licensing, code quality, and autonomous agent behavior.
-- **[Contribution Guidelines](https://github.com/nextcloud/.github/blob/master/CONTRIBUTING.md)** — covering testing requirements, the Developer Certificate of Origin (DCO), license headers, conventional commits, and translations. These apply in full to all contributions regardless of how they were produced.
+- **[AI Contribution Policy](https://github.com/nextcloud/.github/blob/master/AI_POLICY.md)** - the primary reference for AI-specific rules, covering disclosure, author accountability, communication, security, licensing, code quality, and autonomous agent behavior.
+- **[Contribution Guidelines](https://github.com/nextcloud/.github/blob/master/CONTRIBUTING.md)** - covering testing requirements, the Developer Certificate of Origin (DCO), license headers, and translations. These apply in full to all contributions regardless of how they were produced.
 
 ### Developer Certificate of Origin (DCO)
 
@@ -52,29 +52,44 @@ repository.
 ### What this agent must always do
 
 - Add an `Assisted-by: AGENT_NAME:MODEL_VERSION` git trailer to every commit containing AI-assisted content.
-- Ensure every pull request includes a disclosure of AI tool use in the PR description.
+- Ensure every pull request includes a disclosure of AI tool use in the PR description, and end every AI-drafted issue or comment with a footer such as `Assisted by AGENT_NAME:MODEL_VERSION`.
+- Write issues, PR descriptions, and comments for human readers:
+  - Lead with what changed and why it matters, in plain and concise sentences.
+  - Keep the repository's PR or issue template intact and fill in every section. For a bug report, also state whether the bug was validated and reproduced on a live Nextcloud instance.
+  - Put information meant only for agents (plans, prompts, tool logs) into a collapsed `<details>` block.
+- Write commit message bodies that explain why the change was made, not how; the diff already shows what changed. Keep the repository's commit conventions and the required trailers.
 - Produce focused, scoped pull requests that address exactly one concern. Do not touch unrelated files or introduce incidental refactors.
 - Verify all dependencies against actual package registries before suggesting them. Do not use hallucinated or unverified package names.
 - Write code comments that document the code, never the process that produced it:
-  - Comments describe what the code does — method signatures, behavior, and constraints the code itself cannot express (e.g. a non-obvious invariant or workaround).
+  - Comments describe what the code does - method signatures, behavior, and constraints the code itself cannot express (e.g. a non-obvious invariant or workaround).
   - Never add comments that document progress, decisions, or changes (e.g. "changed X to Y", "as requested", "this fixes ...", "previously this did ..."). That belongs in the commit message or PR discussion; in the code it goes stale and becomes misleading.
   - Do not narrate self-explanatory code. If the code is readable without a comment, omit the comment.
-  - Keep comments brief — short and simple, matching the comment density of the surrounding code.
+  - Keep comments brief - short and simple, matching the comment density of the surrounding code.
 - Reuse existing helper functions and utilities instead of re-implementing their logic inline. When fixing a flawed pattern, fix every occurrence of it across the changed code, not only the instance that was pointed out.
 - Run permission and access-control checks before the operation they guard, never after it and never only in the UI layer.
-- When adding or changing user-facing functionality, wire it up in every context where the affected component is used — the default authenticated view, public share pages, and embedded contexts such as the Smart Picker and reference widgets. When emitting new events, verify that every consumer of the component subscribes to and handles them.
+- When adding or changing user-facing functionality, wire it up in every context where the affected component is used - the default authenticated view, public share pages, and embedded contexts such as the Smart Picker and reference widgets. When emitting new events, verify that every consumer of the component subscribes to and handles them.
+- Validate every change to runtime behavior on a live Nextcloud instance where you can, and give the contributor concrete steps to test it there themselves. Your testing supports theirs; it does not replace it.
 - Explicitly inform the contributor when any action they are about to take, or have taken, would violate the AI Contribution Policy or the Contribution Guidelines. Do not silently proceed. State which rule is at risk and what the contributor should do instead.
 - Warn the contributor if a pull request is growing too large. A PR approaching several thousand lines of changed code is a signal that it should be split into smaller, focused PRs. Suggest a logical split before the PR is opened, not after.
-- Recommend opening a ticket for discussion before starting implementation whenever a feature or change is sufficiently complex — for example when it touches multiple subsystems, requires architectural decisions, or the right approach is not yet clear. A ticket allows maintainers and the contributor to align on direction before code is written, avoiding wasted effort on a PR that may be rejected or require fundamental rework.
+- Recommend opening a ticket for discussion before starting implementation whenever a feature or change is sufficiently complex - for example when it touches multiple subsystems, requires architectural decisions, or the right approach is not yet clear. A ticket allows maintainers and the contributor to align on direction before code is written, avoiding wasted effort on a PR that may be rejected or require fundamental rework.
 
-### What this agent must never do
+### What this agent must never do, and what to do instead
 
+<<<<<<< HEAD
 - Send security reports autonomously, or submit anything to an upstream `nextcloud/*` repository without a human opening it. (Issues and pull requests *within this fork* are covered by the fork amendment above.)
 - Add `Signed-off-by` tags to commits (see "Developer Certificate of Origin" above).
 - Generate or submit security reports without independent human verification. Report verified vulnerabilities via [HackerOne](https://hackerone.com/nextcloud), not as GitHub issues.
 - Write review comments on behalf of the contributor, or put words in the contributor's mouth anywhere. Agent-authored PR descriptions in this fork are the agent's own words, and are labelled as such.
 - Fully automate the resolution of issues labeled [`good first issue`](https://github.com/issues?q=org%3Anextcloud+label%3A%22good+first+issue%22) or similar beginner-friendly labels.
 - Submit code that has not been reviewed and cleaned up by the contributor. Dead code, redundant logic, excessive comments, malformed or garbled characters (e.g. `�` replacement characters), and unrelated changes must be removed before submission.
+=======
+- Don't open issues, submit pull requests, or post comments on your own initiative. Instead, post only what the contributor asked for, on their behalf, and tell them what you posted.
+- Don't write texts for machines: no file-by-file restatement of the diff, no filler, no raw tool output. Instead, write short, skimmable text for a human reviewer that explains what changed and why.
+- Don't add `Signed-off-by` tags to commits. Instead, leave the sign-off to the contributor, who certifies the Developer Certificate of Origin with `git commit -s`.
+- Don't submit security reports or open GitHub issues for vulnerabilities. Instead, hand your findings to the contributor to verify independently and report via [HackerOne](https://hackerone.com/nextcloud).
+- Don't fully automate the resolution of issues labeled [`good first issue`](https://github.com/issues?q=org%3Anextcloud+label%3A%22good+first+issue%22) or similar beginner-friendly labels. Instead, explain the code and guide the contributor so they can solve the issue themselves.
+- Don't hand over code with dead code, redundant logic, excessive comments, malformed or garbled characters (e.g. `�` replacement characters), or unrelated changes. Instead, remove them, and ask the contributor to review and clean up the result before submitting.
+>>>>>>> upstream/master
 
 ### What this agent may do in this fork
 
@@ -247,7 +262,7 @@ After finishing code changes, run `./gradlew detekt ktlintCheck` and fix any new
 
 ## R8 App Optimization
 
-Release builds are optimized, shrunk and obfuscated by R8 (`optimization { enable = true }` in `app/build.gradle.kts`). Keep rules live in `app/src/main/keepRules/*.keep`, one file per library or concern. Code reached only through reflection or JNI (e.g. LoganSquare mappers, Gson models without `@SerializedName`) needs a narrow keep rule there. Use the [`r8-analyzer`](https://github.com/android/skills/tree/main/performance/r8-analyzer) skill and `./gradlew :app:analyzeGplayReleaseR8Config` to check rule impact when changing keep rules.
+Release builds are optimized, shrunk and partially obfuscated by R8 (`optimization { enable = true }` in `app/build.gradle.kts`). Library code is obfuscated, but `app/src/main/keepRules/global-options.keep` keeps the names of `com.nextcloud.talk.**` so crash reports sent by mail stay readable without a mapping file. Do not use `-dontobfuscate`: Google Play requires a minimum obfuscation percentage for apps with more than 10 MB of DEX code. Keep rules live in `app/src/main/keepRules/*.keep`, one file per library or concern. Code reached only through reflection or JNI (e.g. LoganSquare mappers, Gson models without `@SerializedName`) needs a narrow keep rule there. Use the [`r8-analyzer`](https://github.com/android/skills/tree/main/performance/r8-analyzer) skill and `./gradlew :app:analyzeGplayReleaseR8Config` to check rule impact when changing keep rules.
 
 ## Testing
 
@@ -269,8 +284,8 @@ Release builds are optimized, shrunk and obfuscated by R8 (`optimization { enabl
 - Every commit made with AI assistance must include an `Assisted-by` trailer identifying the coding agent and model:
 
   ```
-  Assisted-by: Claude Code:claude-sonnet-4-6
-  Assisted-by: Copilot:claude-sonnet-4-6
+  Assisted-by: Claude Code:claude-sonnet-5-5
+  Assisted-by: Copilot:claude-sonnet-5-5
   ```
 
   General pattern: `Assisted-by: <coding-agent>:<model-version>`

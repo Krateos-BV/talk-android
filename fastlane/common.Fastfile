@@ -31,6 +31,23 @@ default_platform(:android)
 ENV['SUPPLY_UPLOAD_MAX_RETRIES']='10'
 
 platform :android do
+	# Usage: fastlane incrementVersion type:(major|minor|patch|rc|final)
+    # For major, minor, and patch: will increment that version number by 1 and set the smaller ones to 0
+    # For rc, final: will set build number to first rc/first final or increment it by 1
+    desc "Increment version code and version name"
+    lane :incrementVersion do |options|
+        versionInfo = getVersionInfo()
+        versionComponents = parseVersionCode(versionInfo)
+        newVersionComponents = incrementVersionComponents(versionComponents: versionComponents, type: options[:type])
+        versionNameGenerated = generateVersionName(newVersionComponents)
+        versionCodeGenerated = generateVersionCode(newVersionComponents)
+
+        promptYesNo(text: "Version code: #{versionInfo["versionCode"]} -> #{versionCodeGenerated}\n" +
+                        "Version name: #{versionInfo["versionName"]} -> #{versionNameGenerated}"
+        )
+        writeVersions(versionCode: versionCodeGenerated, versionName: versionNameGenerated)
+    end
+    
     desc "Run tests and build app"
     lane :releasePhase1 do
     	sh("rm -rf ../release/ && mkdir -p ../release")
@@ -45,6 +62,7 @@ platform :android do
     
     desc "Release phase 2: checks, tag, create GH release, upload to appstores"
 	lane :releasePhase2 do
+		ensure_git_status_clean(show_uncommitted_changes: true)
 		versionInfo = getVersionInfo()
 		versionComponents = parseVersionCode(versionInfo)
 		checkReleasable(versionComponents)
@@ -70,23 +88,6 @@ platform :android do
         print "Minor: #{versionComponents["minor"]}\n"
         print "Patch: #{versionComponents["patch"]}\n"
         print "Build: #{versionComponents["build"]}\n"
-    end
-
-    # Usage: fastlane incrementVersion type:(major|minor|patch|rc|final)
-    # For major, minor, and patch: will increment that version number by 1 and set the smaller ones to 0
-    # For rc, final: will set build number to first rc/first final or increment it by 1
-    desc "Increment version code and version name"
-    lane :incrementVersion do |options|
-        versionInfo = getVersionInfo()
-        versionComponents = parseVersionCode(versionInfo)
-        newVersionComponents = incrementVersionComponents(versionComponents: versionComponents, type: options[:type])
-        versionNameGenerated = generateVersionName(newVersionComponents)
-        versionCodeGenerated = generateVersionCode(newVersionComponents)
-
-        promptYesNo(text: "Version code: #{versionInfo["versionCode"]} -> #{versionCodeGenerated}\n" +
-                        "Version name: #{versionInfo["versionName"]} -> #{versionNameGenerated}"
-        )
-        writeVersions(versionCode: versionCodeGenerated, versionName: versionNameGenerated)
     end
     
     desc "Upload Alpha version to play store"
@@ -171,8 +172,8 @@ platform :android do
     private_lane :writeVersions do |options|
         File.open("../app/build.gradle.kts","r+") do |file|
             text = file.read
-            text.gsub!(/versionName = "(.*)"$/, "versionName = \"#{options[:versionName]}\"")
-            text.gsub!(/versionCode = ([0-9]*)$/, "versionCode = #{options[:versionCode]}")
+            text.sub!(/versionName = "(.*)"$/, "versionName = \"#{options[:versionName]}\"")
+            text.sub!(/versionCode = ([0-9]*)$/, "versionCode = #{options[:versionCode]}")
             file.rewind
             file.write(text)
             file.truncate(file.pos)
@@ -275,7 +276,7 @@ platform :android do
 			flavor: options[:flavor],
 			build_type: 'Release',
 			print_command: false,
-			properties: GRADLE_SIGNING_PROPERTIES
+			properties: defined?(APK_SIGNING_PROPERTIES) ? APK_SIGNING_PROPERTIES : GRADLE_SIGNING_PROPERTIES
 			)
 			
 		sh("mv ../app/build/outputs/apk/#{options[:flavor]}/release/*.apk ../release/nextcloud-#{APP}-#{options[:flavor]}-#{options[:versionCode]}.apk")
@@ -340,8 +341,8 @@ platform :android do
 			name: options[:name],
 			is_prerelease: options[:isPrerelease],
 			tag_name: options[:tag],
-			description: (File.read("metadata/android/en-US/changelogs/" + options[:versionCode] + ".txt") rescue "No changelog provided"),
-			upload_assets: Dir.glob("release/*.apk")
+			description: (File.read("metadata/android/en-US/changelogs/#{options[:versionCode]}.txt") rescue "No changelog provided"),
+			upload_assets: Dir.glob(File.expand_path("../release/*.apk"))
 		)
 	end
 	
